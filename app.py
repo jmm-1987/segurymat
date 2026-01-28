@@ -959,8 +959,26 @@ if __name__ == '__main__':
     # Inicializar base de datos
     database.db.init_db()
     
-    # Modo polling para desarrollo local (si no hay webhook configurado)
-    if telegram_app and not config.TELEGRAM_WEBHOOK_URL:
+    # En producción (con webhook): NO usar polling, solo webhook
+    # En desarrollo local (sin webhook): usar polling
+    if telegram_app and config.TELEGRAM_WEBHOOK_URL:
+        logger.info("🌐 Bot configurado para usar webhook (producción)")
+        logger.info(f"   Webhook URL: {config.TELEGRAM_WEBHOOK_URL}")
+        logger.info("   ⚠️  IMPORTANTE: NO se usará polling, solo webhook")
+        # Asegurar que no haya webhooks locales configurados
+        try:
+            import asyncio
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            webhook_info = loop.run_until_complete(telegram_app.bot.get_webhook_info())
+            if webhook_info.url and 'localhost' in webhook_info.url or '127.0.0.1' in webhook_info.url or 'ngrok' in webhook_info.url:
+                logger.warning(f"⚠️  Webhook local detectado: {webhook_info.url}")
+                logger.warning("   Esto puede causar conflictos. Configura el webhook para Render.")
+            loop.close()
+        except Exception as e:
+            logger.debug(f"No se pudo verificar webhook: {e}")
+    elif telegram_app and not config.TELEGRAM_WEBHOOK_URL:
+        # Solo usar polling si NO hay webhook configurado (desarrollo local)
         def start_polling():
             """Inicia el bot en modo polling en un thread separado"""
             try:
@@ -977,8 +995,6 @@ if __name__ == '__main__':
         polling_thread = threading.Thread(target=start_polling, daemon=True, name="telegram_polling")
         polling_thread.start()
         logger.info("✅ Bot de Telegram iniciado en modo polling (desarrollo local)")
-    elif telegram_app and config.TELEGRAM_WEBHOOK_URL:
-        logger.info("🌐 Bot configurado para usar webhook (producción)")
     
     # Iniciar aplicación Flask
     app.run(
