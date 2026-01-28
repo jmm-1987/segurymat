@@ -51,3 +51,19 @@ def clean_temp_files(filepath: str) -> None:
             os.remove(filepath)
     except Exception as e:
         print(f"Warning: No se pudo eliminar archivo temporal {filepath}: {e}")
+
+
+def format_date(date_value: Optional[str | datetime]) -> str:
+    """Formatea una fecha a 'dd/mm/aaaa'."""
+    from datetime import datetime
+    if not date_value:
+        return ''
+    if isinstance(date_value, datetime):
+        return date_value.strftime('%d/%m/%Y')
+    try:
+        # Intentar parsear como ISO con o sin hora
+        dt = datetime.fromisoformat(date_value.replace('Z', '+00:00'))
+        return dt.strftime('%d/%m/%Y')
+    except ValueError:
+        # Fallback para otros formatos si es necesario, o simplemente devolver el original
+        return date_value.split('T')[0] if 'T' in date_value else date_value

@@ -460,18 +460,30 @@ class TelegramBotHandler:
     async def _create_task_with_category(self, update_or_query, context: ContextTypes.DEFAULT_TYPE,
                                          user, category: str, user_state: dict):
         """Crea la tarea con la categoría seleccionada"""
-        # Crear tarea
-        task_id = self.db.create_task(
-            user_id=user.id,
-            user_name=user.full_name or user.username,
-            title=user_state['title'],
-            description=user_state['parsed']['original_text'],
-            priority=user_state['priority'],
-            task_date=user_state['task_date'],
-            client_id=user_state['client_id'],
-            client_name_raw=user_state['client_name_raw'],
-            category=category
-        )
+        try:
+            # Crear tarea
+            task_id = self.db.create_task(
+                user_id=user.id,
+                user_name=user.full_name or user.username,
+                title=user_state['title'],
+                description=user_state['parsed']['original_text'],
+                priority=user_state.get('priority', 'normal'),
+                task_date=user_state.get('task_date'),
+                client_id=user_state.get('client_id'),
+                client_name_raw=user_state.get('client_name_raw'),
+                category=category
+            )
+            logger.info(f"[TASK] Tarea creada exitosamente: ID={task_id}, Usuario={user.id}, Categoría={category}")
+        except Exception as e:
+            logger.error(f"[TASK] Error al crear tarea: {e}", exc_info=True)
+            error_msg = f"❌ Error al crear la tarea: {str(e)}"
+            if hasattr(update_or_query, 'callback_query') and update_or_query.callback_query:
+                await update_or_query.callback_query.edit_message_text(error_msg)
+            elif hasattr(update_or_query, 'edit_message_text'):
+                await update_or_query.edit_message_text(error_msg)
+            elif hasattr(update_or_query, 'message') and update_or_query.message:
+                await update_or_query.message.reply_text(error_msg)
+            return
         
         # Si hay una imagen pendiente, adjuntarla automáticamente
         photo_file_id = user_state.get('photo_file_id')
@@ -495,8 +507,27 @@ class TelegramBotHandler:
             except Exception as e:
                 logger.error(f"Error adjuntando imagen a nueva tarea: {e}", exc_info=True)
         
-        # Limpiar estado
-        del self.user_states[user.id]
+        # Verificar que la tarea se creó correctamente
+        task_created = self.db.get_task_by_id(task_id)
+        if not task_created:
+            logger.error(f"[TASK] Error: Tarea {task_id} no se encontró después de crearla")
+            error_msg = "❌ Error: No se pudo crear la tarea. Por favor, intenta de nuevo."
+            if hasattr(update_or_query, 'callback_query') and update_or_query.callback_query:
+                await update_or_query.callback_query.edit_message_text(error_msg)
+            elif hasattr(update_or_query, 'edit_message_text'):
+                await update_or_query.edit_message_text(error_msg)
+            elif hasattr(update_or_query, 'message') and update_or_query.message:
+                await update_or_query.message.reply_text(error_msg)
+            return
+        
+        logger.info(f"[TASK] Tarea {task_id} creada exitosamente. Enviando confirmación...")
+        
+        # Limpiar estado DESPUÉS de crear la tarea
+        if user.id in self.user_states:
+            del self.user_states[user.id]
+        
+        # Determinar cómo enviar la confirmación según el tipo de update
+        message_to_send = None
         
         # Si es callback query, editar mensaje primero y luego enviar confirmación
         if hasattr(update_or_query, 'callback_query') and update_or_query.callback_query:
@@ -510,15 +541,8 @@ class TelegramBotHandler:
                 message_text += "\n📷 Imagen adjuntada"
             
             await update.callback_query.edit_message_text(message_text)
-            # Crear un objeto Update simulado para usar _send_task_confirmation
-            class FakeUpdate:
-                def __init__(self, message):
-                    self.message = message
-                    self.effective_message = message
-                    self.effective_user = message.from_user
-            
-            fake_update = FakeUpdate(update.callback_query.message)
-            await self._send_task_confirmation(fake_update, context, task_id, user)
+            # Usar el mensaje del callback query para enviar la confirmación
+            message_to_send = update.callback_query.message
         elif hasattr(update_or_query, 'edit_message_text'):
             # Es un CallbackQuery directamente
             query = update_or_query
@@ -531,12 +555,21 @@ class TelegramBotHandler:
                 message_text += "\n📷 Imagen adjuntada"
             
             await query.edit_message_text(message_text)
-            await self._send_task_confirmation(query.message, context, task_id, user)
+            # Usar el mensaje del query para enviar la confirmación
+            message_to_send = query.message
         else:
             # Es un Update normal
             update = update_or_query
-            # Responder con confirmación y botones
-            await self._send_task_confirmation(update, context, task_id, user)
+            if hasattr(update, 'message') and update.message:
+                message_to_send = update.message
+            elif hasattr(update, 'effective_message'):
+                message_to_send = update.effective_message
+        
+        # Enviar confirmación con todos los datos de la tarea
+        if message_to_send:
+            await self._send_task_confirmation(message_to_send, context, task_id, user)
+        else:
+            logger.error(f"[TASK] No se pudo determinar cómo enviar confirmación para tarea {task_id}")
     
     async def _ask_client_confirmation(self, update: Update, context: ContextTypes.DEFAULT_TYPE,
                                       client_match: dict, parsed: dict, user):
@@ -585,34 +618,47 @@ class TelegramBotHandler:
             reply_markup=reply_markup
         )
     
-    async def _send_task_confirmation(self, update: Update, context: ContextTypes.DEFAULT_TYPE,
+    async def _send_task_confirmation(self, update_or_message, context: ContextTypes.DEFAULT_TYPE,
                                      task_id: int, user):
-        """Envía confirmación de tarea creada con botones"""
+        """Envía confirmación de tarea creada con todos los datos"""
         task = self.db.get_task_by_id(task_id)
         if not task:
-            await update.message.reply_text("❌ Error: Tarea no encontrada.")
+            error_msg = "❌ Error: Tarea no encontrada."
+            if hasattr(update_or_message, 'reply_text'):
+                await update_or_message.reply_text(error_msg)
+            elif hasattr(update_or_message, 'message') and update_or_message.message:
+                await update_or_message.message.reply_text(error_msg)
             return
         
-        # Formatear mensaje
+        # Importar format_date desde utils
+        from utils import format_date
+        
+        # Formatear mensaje con TODOS los datos
         client_info = ""
         if task['client_id']:
             client = self.db.get_client_by_id(task['client_id'])
             if client:
                 client_info = f"\n👤 Cliente: {client['name']}"
-        elif task['client_name_raw']:
+        elif task.get('client_name_raw'):
             client_info = f"\n👤 Cliente: {task['client_name_raw']} (sin asociar)"
         
         date_info = ""
-        if task['task_date']:
-            task_dt = datetime.fromisoformat(task['task_date'])
-            date_info = f"\n📅 Fecha: {task_dt.strftime('%d/%m/%Y %H:%M')}"
+        if task.get('task_date'):
+            date_info = f"\n📅 Fecha: {format_date(task['task_date'])}"
         
         priority_emoji = {
             'urgent': '🔴',
             'high': '🟠',
             'normal': '🟡',
             'low': '🟢'
-        }.get(task['priority'], '🟡')
+        }.get(task.get('priority', 'normal'), '🟡')
+        
+        priority_text = {
+            'urgent': 'Urgente',
+            'high': 'Alta',
+            'normal': 'Normal',
+            'low': 'Baja'
+        }.get(task.get('priority', 'normal'), 'Normal')
         
         category_info = ""
         if task.get('category'):
@@ -629,14 +675,16 @@ class TelegramBotHandler:
         if images:
             image_info = f"\n📷 Imágenes adjuntas: {len(images)}"
         
+        # Mensaje completo con todos los datos
         message = (
-            f"✅ Tarea creada:\n\n"
-            f"📝 {task['title']}"
+            f"✅ **Tarea creada exitosamente**\n\n"
+            f"📝 **Título:** {task['title']}"
             f"{client_info}"
             f"{date_info}"
             f"{category_info}"
-            f"\n{priority_emoji} Prioridad: {task['priority']}"
+            f"\n{priority_emoji} **Prioridad:** {priority_text}"
             f"{image_info}"
+            f"\n\n🆔 **ID:** {task_id}"
         )
         
         # Botones
@@ -645,7 +693,7 @@ class TelegramBotHandler:
         # Botones principales
         keyboard.append([
             InlineKeyboardButton("✅ Confirmar", callback_data=f"confirm_task:{task_id}"),
-            InlineKeyboardButton("✏️ Cambiar", callback_data=f"edit_task:{task_id}")
+            InlineKeyboardButton("✏️ Editar", callback_data=f"edit_task:{task_id}")
         ])
         
         keyboard.append([
@@ -666,15 +714,35 @@ class TelegramBotHandler:
         # Añadir teclado de respuesta siempre visible
         reply_keyboard = self._get_reply_keyboard()
         
-        # Si es callback query, editar mensaje; si no, responder
-        if hasattr(update, 'message') and update.message:
-            await update.message.reply_text(message, reply_markup=reply_keyboard)
-        elif context and hasattr(context, 'message'):
-            await context.message.reply_text(message, reply_markup=reply_keyboard)
-        else:
-            # Fallback: usar el update directamente
-            if hasattr(update, 'effective_message'):
-                await update.effective_message.reply_text(message, reply_markup=reply_keyboard)
+        # Determinar cómo enviar el mensaje según el tipo de update
+        try:
+            # Si es un Message directamente
+            if hasattr(update_or_message, 'reply_text'):
+                await update_or_message.reply_text(message, reply_markup=reply_keyboard, parse_mode='Markdown')
+            # Si es un Update con message
+            elif hasattr(update_or_message, 'message') and update_or_message.message:
+                await update_or_message.message.reply_text(message, reply_markup=reply_keyboard, parse_mode='Markdown')
+            # Si es un Update con effective_message
+            elif hasattr(update_or_message, 'effective_message'):
+                await update_or_message.effective_message.reply_text(message, reply_markup=reply_keyboard, parse_mode='Markdown')
+            # Si es un CallbackQuery message
+            elif hasattr(update_or_message, 'edit_text'):
+                # Es un CallbackQuery, enviar nuevo mensaje en lugar de editar
+                if hasattr(update_or_message, 'message') and update_or_message.message:
+                    await update_or_message.message.reply_text(message, reply_markup=reply_keyboard, parse_mode='Markdown')
+            else:
+                logger.error(f"No se pudo determinar cómo enviar mensaje de confirmación. Tipo: {type(update_or_message)}")
+        except Exception as e:
+            logger.error(f"Error enviando confirmación de tarea: {e}", exc_info=True)
+            # Intentar fallback sin parse_mode
+            try:
+                message_plain = message.replace('**', '')
+                if hasattr(update_or_message, 'reply_text'):
+                    await update_or_message.reply_text(message_plain, reply_markup=reply_keyboard)
+                elif hasattr(update_or_message, 'message') and update_or_message.message:
+                    await update_or_message.message.reply_text(message_plain, reply_markup=reply_keyboard)
+            except Exception as e2:
+                logger.error(f"Error en fallback de confirmación: {e2}", exc_info=True)
     
     async def _handle_list_tasks(self, update: Update, context: ContextTypes.DEFAULT_TYPE,
                                 parsed: dict, user):
