@@ -2,6 +2,7 @@
 import re
 import unicodedata
 from typing import Optional
+from datetime import datetime
 
 
 def normalize_text(text: str) -> str:
@@ -55,7 +56,6 @@ def clean_temp_files(filepath: str) -> None:
 
 def format_date(date_value: Optional[str | datetime]) -> str:
     """Formatea una fecha a 'dd/mm/aaaa'."""
-    from datetime import datetime
     if not date_value:
         return ''
     if isinstance(date_value, datetime):
