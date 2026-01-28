@@ -1,0 +1,1872 @@
+/* Estilos para la aplicación web */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    background: linear-gradient(135deg, #1a1a1a 0%, #2c3e50 50%, #1e3a5f 100%);
+    background-attachment: fixed;
+    color: #333;
+    line-height: 1.5;
+    min-height: 100vh;
+    overflow-x: hidden;
+    overflow-y: auto;
+    position: relative;
+    font-size: 0.9rem;
+}
+
+.container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 8px 15px 15px 15px;
+    position: relative;
+    overflow: visible;
+}
+
+/* Navbar */
+.navbar {
+    background: rgba(255, 255, 255, 0.98);
+    backdrop-filter: blur(10px);
+    color: #2c3e50;
+    padding: 0.5rem 0;
+    margin-bottom: 1rem;
+    box-shadow: 0 2px 15px rgba(0, 0, 0, 0.1);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.nav-container {
+    max-width: 1400px;
+    margin: 0 auto;
+    padding: 0 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.nav-logo-title {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+
+.nav-logo {
+    height: 32px;
+    width: auto;
+    object-fit: contain;
+}
+
+.navbar h2 {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #1e3a5f;
+    margin: 0;
+}
+
+.navbar h1 {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #1e3a5f;
+}
+
+.nav-links {
+    display: flex;
+    gap: 0.3rem;
+}
+
+.nav-links a {
+    color: #2c3e50;
+    text-decoration: none;
+    padding: 0.35rem 0.8rem;
+    border-radius: 6px;
+    transition: all 0.3s ease;
+    font-weight: 500;
+    font-size: 0.85rem;
+}
+
+.nav-links a:hover {
+    background: #1e3a5f;
+    color: white;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(30, 58, 95, 0.3);
+}
+
+/* Login */
+.login-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    background: linear-gradient(135deg, #1a1a1a 0%, #2c3e50 50%, #1e3a5f 100%);
+}
+
+.login-box {
+    background: white;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+    width: 100%;
+    max-width: 400px;
+}
+
+.login-box h1 {
+    text-align: center;
+    margin-bottom: 0.5rem;
+}
+
+.login-box h2 {
+    text-align: center;
+    margin-bottom: 1.5rem;
+    color: #666;
+    font-size: 1.2rem;
+}
+
+/* Forms */
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+}
+
+.form-group input,
+.form-group select,
+.form-group textarea {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-size: 1rem;
+}
+
+/* Buttons */
+.btn {
+    padding: 0.45rem 0.9rem;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-size: 0.8rem;
+    font-weight: 600;
+    text-decoration: none;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.1);
+}
+
+.btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+}
+
+.btn-primary {
+    background: #1e3a5f;
+    color: white;
+}
+
+.btn-primary:hover {
+    background: #2c3e50;
+}
+
+.btn-secondary {
+    background: linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%);
+    color: white;
+}
+
+.btn-secondary:hover {
+    background: linear-gradient(135deg, #7f8c8d 0%, #95a5a6 100%);
+}
+
+.btn-success {
+    background: linear-gradient(135deg, #27ae60 0%, #229954 100%);
+    color: white;
+}
+
+.btn-success:hover {
+    background: linear-gradient(135deg, #229954 0%, #27ae60 100%);
+}
+
+.btn-danger {
+    background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+    color: white;
+}
+
+.btn-danger:hover {
+    background: linear-gradient(135deg, #c0392b 0%, #e74c3c 100%);
+}
+
+.btn-google-calendar {
+    background: white;
+    color: #EA4335;
+    border: 2px solid #EA4335;
+    display: inline-flex;
+    align-items: center;
+}
+
+.btn-google-calendar:hover {
+    background: #EA4335;
+    color: white;
+}
+
+.btn-google-calendar svg {
+    width: 18px;
+    height: 18px;
+    margin-right: 4px;
+}
+
+.btn-solution {
+    background: linear-gradient(135deg, #1e3a5f 0%, #2c3e50 100%);
+    color: white;
+}
+
+.btn-solution:hover {
+    background: linear-gradient(135deg, #2c3e50 0%, #1e3a5f 100%);
+}
+
+.btn-small {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.75rem;
+    border-radius: 6px;
+}
+
+/* Alerts */
+.alert {
+    padding: 1rem;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+}
+
+.alert-error {
+    background-color: #fee;
+    color: #c33;
+    border: 1px solid #fcc;
+}
+
+.alert-success {
+    background-color: #efe;
+    color: #3c3;
+    border: 1px solid #cfc;
+}
+
+/* Filters */
+.filters {
+    padding: 0.3rem 0.8rem;
+    margin-bottom: 1rem;
+    margin-top: 0;
+    position: sticky;
+    top: 0;
+    z-index: 1000;
+    overflow: visible;
+    background: transparent;
+    backdrop-filter: blur(10px);
+}
+
+/* Menú circular tipo dock de macOS */
+.dock-container {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    gap: 0.75rem;
+    padding: 0.4rem 0.8rem;
+    margin: 0 auto;
+    max-width: fit-content;
+    position: relative;
+    z-index: 1000;
+    overflow: visible;
+    flex-wrap: nowrap;
+    background: rgba(255, 255, 255, 0.98);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+    flex: 1;
+}
+
+/* Contenedor redondo para el logo a la izquierda */
+.logo-container {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 55px;
+    height: 55px;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.98);
+    backdrop-filter: blur(10px);
+    box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+    margin-right: 0.75rem;
+    flex-shrink: 0;
+    animation: rotateLogo 10s linear infinite;
+}
+
+@keyframes rotateLogo {
+    from {
+        transform: rotate(0deg);
+    }
+    to {
+        transform: rotate(360deg);
+    }
+}
+
+.logo-img {
+    height: 35px;
+    width: auto;
+    object-fit: contain;
+    max-width: 50px;
+}
+
+.dock-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: visible;
+}
+
+.dock-button {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    border: none;
+    background: rgba(255, 255, 255, 0.15);
+    backdrop-filter: blur(10px);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+    box-shadow: 0 3px 12px rgba(0, 0, 0, 0.2);
+    position: relative;
+    z-index: 10;
+}
+
+.dock-tooltip {
+    position: absolute;
+    bottom: -35px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(0, 0, 0, 0.85);
+    color: white;
+    padding: 0.4rem 0.8rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    white-space: nowrap;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.3s ease;
+    pointer-events: none;
+    z-index: 1000;
+    font-weight: 500;
+}
+
+.dock-tooltip::before {
+    content: '';
+    position: absolute;
+    top: -5px;
+    left: 50%;
+    transform: translateX(-50%);
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-bottom: 5px solid rgba(0, 0, 0, 0.85);
+}
+
+.dock-button:hover .dock-tooltip {
+    opacity: 1;
+    visibility: visible;
+    bottom: -40px;
+}
+
+.dock-button:hover {
+    transform: translateY(-10px) scale(1.15);
+    background: rgba(255, 255, 255, 0.25);
+    box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
+}
+
+.dock-button:active {
+    transform: translateY(-5px) scale(1.05);
+}
+
+.dock-button-primary {
+    background: linear-gradient(135deg, #1e3a5f, #2c5f8f);
+}
+
+.dock-button-primary:hover {
+    background: linear-gradient(135deg, #2c5f8f, #3d7fb8);
+}
+
+.dock-button-secondary {
+    background: linear-gradient(135deg, #6c757d, #8e9ba8);
+}
+
+.dock-button-danger {
+    background: linear-gradient(135deg, #e74c3c, #c0392b);
+}
+
+.dock-button-danger:hover {
+    background: linear-gradient(135deg, #c0392b, #a93226);
+}
+
+.dock-button-settings {
+    background: linear-gradient(135deg, #95a5a6, #7f8c8d);
+}
+
+.dock-button-settings:hover {
+    background: linear-gradient(135deg, #7f8c8d, #6c7a7b);
+    transform: translateY(-5px) scale(1.1);
+}
+
+.dock-action .dock-button {
+    text-decoration: none;
+    color: white;
+}
+
+.dock-action .dock-button:hover {
+    transform: translateY(-10px) scale(1.15);
+}
+
+.dock-icon {
+    font-size: 1.4rem;
+    line-height: 1;
+}
+
+/* Menú desplegable */
+.dock-menu {
+    position: absolute;
+    left: 50%;
+    top: calc(100% + 10px);
+    transform: translateX(-50%) scale(0);
+    transform-origin: top center;
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.4s cubic-bezier(0.34, 1.56, 0.64, 1),
+                visibility 0.4s,
+                transform 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    z-index: 10000;
+    pointer-events: none;
+    margin: 0;
+    padding: 0;
+}
+
+.dock-item.active .dock-menu {
+    opacity: 1;
+    visibility: visible;
+    pointer-events: all;
+    transform: translateX(-50%) scale(1);
+}
+
+.dock-menu-content {
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(20px);
+    border-radius: 15px;
+    padding: 0.5rem;
+    box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+    min-width: 180px;
+    max-height: 300px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    animation: slideDown 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+    position: relative;
+}
+
+@keyframes slideDown {
+    from {
+        transform: translateY(-20px);
+        opacity: 0;
+    }
+    to {
+        transform: translateY(0);
+        opacity: 1;
+    }
+}
+
+.dock-option {
+    display: flex;
+    align-items: center;
+    padding: 0.75rem 1rem;
+    cursor: pointer;
+    border-radius: 10px;
+    transition: all 0.2s ease;
+    margin: 0.25rem 0;
+}
+
+.dock-option:hover {
+    background: rgba(30, 58, 95, 0.1);
+    transform: translateX(5px);
+}
+
+.dock-option input[type="radio"] {
+    margin-right: 0.75rem;
+    cursor: pointer;
+    width: 18px;
+    height: 18px;
+    accent-color: #1e3a5f;
+}
+
+.dock-option span {
+    font-size: 0.9rem;
+    color: #333;
+    font-weight: 500;
+}
+
+.dock-date-input,
+.dock-search-input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 2px solid rgba(30, 58, 95, 0.2);
+    border-radius: 10px;
+    font-size: 0.9rem;
+    background: white;
+    color: #333;
+    transition: all 0.2s ease;
+    font-family: inherit;
+}
+
+.dock-date-input:focus,
+.dock-search-input:focus {
+    outline: none;
+    border-color: #1e3a5f;
+    box-shadow: 0 0 0 3px rgba(30, 58, 95, 0.1);
+}
+
+.dock-search-input {
+    min-width: 250px;
+}
+
+/* Efecto de ondas al hacer clic */
+.dock-button::before {
+    content: '';
+    position: absolute;
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.3);
+    transform: scale(0);
+    opacity: 0;
+    transition: transform 0.6s ease, opacity 0.6s ease;
+}
+
+.dock-button:active::before {
+    transform: scale(2);
+    opacity: 0;
+}
+
+/* Cerrar menús al hacer clic fuera */
+/* Los menús se superponen, no necesitamos ocultar el overflow */
+
+.filter-form {
+    display: flex;
+    flex-wrap: nowrap;
+    gap: 0.6rem;
+    align-items: center;
+    overflow: visible;
+    width: 100%;
+}
+
+.filter-form select,
+.filter-form input[type="date"] {
+    flex: 0 0 auto;
+    min-width: 150px;
+}
+
+.filter-form .search-container {
+    flex: 1 1 auto;
+    min-width: 200px;
+    position: relative;
+}
+
+.filter-form .search-input {
+    width: 100%;
+    padding: 0.5rem 0.75rem;
+    padding-left: 2.5rem;
+    border: 2px solid #e0e0e0;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    transition: all 0.3s ease;
+    background: white;
+    font-family: inherit;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.filter-form .search-input::placeholder {
+    color: #999;
+}
+
+.filter-form .search-input:hover {
+    border-color: #1e3a5f;
+    box-shadow: 0 2px 8px rgba(30, 58, 95, 0.1);
+}
+
+.filter-form .search-input:focus {
+    outline: none;
+    border-color: #1e3a5f;
+    box-shadow: 0 0 0 3px rgba(30, 58, 95, 0.15);
+    transform: translateY(-1px);
+}
+
+.filter-form .btn {
+    flex: 0 0 auto;
+    white-space: nowrap;
+}
+
+.filter-form .logout-btn {
+    flex: 0 0 auto;
+    flex-shrink: 0;
+}
+
+.filter-form select,
+.filter-form input[type="date"] {
+    padding: 0.5rem 2.5rem 0.5rem 0.75rem;
+    border: 2px solid #e0e0e0;
+    border-radius: 10px;
+    font-size: 0.85rem;
+    transition: all 0.3s ease;
+    background: white;
+    cursor: pointer;
+    font-family: inherit;
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23333' d='M6 9L1 4h10z'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.75rem center;
+    background-size: 12px;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+}
+
+.filter-form select:hover,
+.filter-form input[type="date"]:hover {
+    border-color: #1e3a5f;
+    box-shadow: 0 2px 8px rgba(30, 58, 95, 0.1);
+}
+
+.filter-form select:focus,
+.filter-form input[type="date"]:focus {
+    outline: none;
+    border-color: #1e3a5f;
+    box-shadow: 0 0 0 3px rgba(30, 58, 95, 0.15);
+    transform: translateY(-1px);
+}
+
+.filter-form input[type="date"] {
+    min-width: 150px;
+}
+
+.filter-form .btn {
+    padding: 0.4rem 0.9rem;
+    border-radius: 6px;
+    font-weight: 600;
+    font-size: 0.85rem;
+    transition: all 0.3s ease;
+}
+
+.filter-form .btn:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+/* Botón de cerrar sesión circular */
+.logout-btn {
+    width: 2.5rem;
+    height: 2.5rem;
+    border-radius: 50%;
+    background: #e74c3c;
+    color: white;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    transition: all 0.3s ease;
+    box-shadow: 0 2px 8px rgba(231, 76, 60, 0.3);
+    border: 2px solid #c0392b;
+    cursor: pointer;
+}
+
+.logout-btn:hover {
+    background: #c0392b;
+    transform: scale(1.1);
+    box-shadow: 0 4px 12px rgba(231, 76, 60, 0.4);
+}
+
+.logout-btn svg {
+    width: 16px;
+    height: 16px;
+    stroke: white;
+}
+
+/* Botón para plegar/desplegar sección */
+.toggle-section-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-radius: 8px;
+    width: 2.5rem;
+    height: 2.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    padding: 0;
+}
+
+.toggle-section-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    border-color: rgba(255, 255, 255, 0.5);
+    transform: scale(1.05);
+}
+
+.toggle-section-btn svg {
+    width: 20px;
+    height: 20px;
+}
+
+/* Botón de clip para imágenes */
+.image-clip-btn {
+    background: rgba(30, 58, 95, 0.1);
+    border: 1px solid rgba(30, 58, 95, 0.3);
+    border-radius: 12px;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.7rem;
+    color: #1e3a5f;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-weight: 500;
+}
+
+.image-clip-btn:hover {
+    background: rgba(30, 58, 95, 0.2);
+    border-color: rgba(30, 58, 95, 0.5);
+    transform: scale(1.05);
+}
+
+/* Vista de calendario semanal */
+.calendar-view {
+    width: 100%;
+    margin-top: 1rem;
+    position: relative;
+}
+
+.weekly-calendar {
+    display: grid;
+    grid-template-columns: auto repeat(7, 1fr) auto;
+    gap: 0.4rem;
+    background: rgba(255, 255, 255, 0.98);
+    backdrop-filter: blur(10px);
+    border-radius: 10px;
+    padding: 0.75rem;
+    box-shadow: 0 3px 15px rgba(0, 0, 0, 0.15);
+    position: relative;
+    align-items: start;
+}
+
+.calendar-arrow {
+    position: sticky;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(30, 58, 95, 0.9);
+    color: white;
+    border: none;
+    border-radius: 50%;
+    width: 36px;
+    height: 36px;
+    font-size: 1.2rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s ease;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+    z-index: 10;
+    align-self: center;
+    flex-shrink: 0;
+    margin: 0 0.2rem;
+}
+
+.calendar-arrow:hover {
+    background: rgba(30, 58, 95, 1);
+    transform: translateY(-50%) scale(1.1);
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+}
+
+.calendar-arrow:active {
+    transform: translateY(-50%) scale(0.95);
+}
+
+.calendar-arrow:disabled {
+    opacity: 0.5 !important;
+    cursor: not-allowed !important;
+    pointer-events: none;
+}
+
+.calendar-arrow-left {
+    grid-column: 1;
+    grid-row: 1;
+}
+
+.calendar-arrow-right {
+    grid-column: 9;
+    grid-row: 1;
+}
+
+.calendar-arrow-center {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    background: rgba(52, 152, 219, 0.9);
+    font-size: 1rem;
+    width: 40px;
+    height: 40px;
+    z-index: 1000;
+    transform: none;
+    border-radius: 8px;
+}
+
+.calendar-arrow-center:hover {
+    background: rgba(52, 152, 219, 1);
+}
+
+.calendar-day {
+    border-right: 1px solid #e8e8e8;
+    min-height: 350px;
+    padding: 0.4rem;
+    background: rgba(255, 255, 255, 0.98);
+}
+
+.calendar-day:last-of-type {
+    border-right: none;
+}
+
+.calendar-day-weekend {
+    background: rgba(180, 180, 200, 0.98);
+    border-left: 3px solid rgba(30, 58, 95, 0.6);
+}
+
+.calendar-day-weekend .calendar-day-header {
+    background: rgba(30, 58, 95, 0.3);
+    border-radius: 6px;
+    padding: 0.5rem;
+    margin-bottom: 0.75rem;
+    border-bottom: 2px solid rgba(30, 58, 95, 0.5);
+}
+
+.calendar-day-weekend .calendar-day-header h4 {
+    color: #1e3a5f;
+    font-weight: 700;
+}
+
+.calendar-day-weekend .calendar-day-date {
+    color: #2c3e50;
+    font-weight: 600;
+}
+
+.calendar-day-weekend .calendar-task-item {
+    background: rgba(220, 220, 240, 0.95);
+    border-left-color: rgba(30, 58, 95, 0.7);
+}
+
+/* Estilos para drag and drop */
+.task-card-slide[draggable="true"] {
+    cursor: grab;
+    user-select: none;
+}
+
+.task-card-slide[draggable="true"]:active {
+    cursor: grabbing;
+}
+
+.calendar-day {
+    transition: all 0.2s ease;
+}
+
+.calendar-day.drag-over {
+    background: rgba(30, 58, 95, 0.1) !important;
+    border: 2px dashed #1e3a5f;
+    border-radius: 8px;
+    transform: scale(1.02);
+    box-shadow: 0 4px 12px rgba(30, 58, 95, 0.3);
+}
+
+.calendar-day-weekend.drag-over {
+    background: rgba(30, 58, 95, 0.2) !important;
+    border: 2px dashed #1e3a5f;
+}
+
+.drop-loading,
+.drop-success,
+.drop-error {
+    padding: 1rem;
+    margin: 0.5rem 0;
+    border-radius: 8px;
+    text-align: center;
+    font-weight: 600;
+    font-size: 0.9rem;
+    animation: fadeIn 0.3s ease;
+}
+
+.drop-loading {
+    background: rgba(52, 152, 219, 0.1);
+    color: #3498db;
+    border: 2px solid #3498db;
+}
+
+.drop-success {
+    background: rgba(39, 174, 96, 0.1);
+    color: #27ae60;
+    border: 2px solid #27ae60;
+}
+
+.drop-error {
+    background: rgba(231, 76, 60, 0.1);
+    color: #e74c3c;
+    border: 2px solid #e74c3c;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.calendar-day-weekend .calendar-day-header h4 {
+    color: #1e3a5f;
+    font-weight: 700;
+}
+
+.calendar-day-weekend .calendar-day-date {
+    color: #2c3e50;
+    font-weight: 600;
+}
+
+.calendar-day-weekend .calendar-task-item {
+    background: rgba(240, 240, 250, 0.9);
+    border-left-color: rgba(30, 58, 95, 0.5);
+}
+
+.calendar-day-header {
+    border-bottom: 2px solid #1e3a5f;
+    padding-bottom: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.calendar-day-header h4 {
+    margin: 0 0 0.2rem 0;
+    color: #1e3a5f;
+    font-size: 0.85rem;
+    font-weight: 600;
+    text-align: center;
+}
+
+.calendar-day-date {
+    text-align: center;
+    font-size: 0.75rem;
+    color: #666;
+    font-weight: 500;
+    margin-top: 0.2rem;
+}
+
+.calendar-day-tasks {
+    display: flex;
+    flex-direction: column;
+    gap: 0.5rem;
+}
+
+.calendar-task-item {
+    background: #f8f9fa;
+    border-left: 2px solid #1e3a5f;
+    border-radius: 5px;
+    padding: 0.4rem;
+    margin-bottom: 0.4rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+
+.calendar-task-item:hover {
+    background: #e9ecef;
+    transform: translateX(2px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.calendar-task-client {
+    font-size: 0.75rem;
+    color: #6c757d;
+    margin-bottom: 0.25rem;
+    font-style: italic;
+}
+
+.calendar-task-title {
+    font-size: 0.75rem;
+    font-weight: 500;
+    color: #2c3e50;
+    margin-bottom: 0.2rem;
+    line-height: 1.3;
+}
+
+.calendar-task-meta {
+    display: flex;
+    gap: 0.25rem;
+    flex-wrap: wrap;
+}
+
+.calendar-task-meta .priority-badge,
+.calendar-task-meta .category-badge {
+    font-size: 0.6rem;
+    padding: 0.15rem 0.3rem;
+}
+
+/* Tasks Grid - Diseño moderno con cards */
+.tasks-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+    gap: 1rem;
+    margin-top: 0.75rem;
+    align-items: start; /* Permite que cada tarjeta tenga su propia altura */
+}
+
+.task-card {
+    background: rgba(255, 255, 255, 0.98);
+    backdrop-filter: blur(10px);
+    border-radius: 10px;
+    padding: 1rem;
+    box-shadow: 0 3px 15px rgba(0, 0, 0, 0.15);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+    transition: all 0.3s ease;
+    position: relative;
+    overflow: visible; /* Cambiado de hidden a visible para que el dropdown se vea */
+    height: auto; /* Altura automática según el contenido */
+    display: flex;
+    flex-direction: column; /* Permite que el contenido se distribuya verticalmente */
+}
+
+.task-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: #1e3a5f;
+    transition: width 0.3s ease;
+}
+
+.task-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.2);
+    border-color: rgba(30, 58, 95, 0.2);
+}
+
+.task-card:hover::before {
+    width: 6px;
+}
+
+.task-card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    margin-bottom: 0.75rem;
+    padding-bottom: 0.75rem;
+    border-bottom: 1px solid #e8e8e8;
+}
+
+.task-card-title {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: #2c3e50;
+    margin: 0;
+    flex: 1;
+    line-height: 1.3;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.task-card-id {
+    font-size: 0.85rem;
+    color: #95a5a6;
+    font-weight: 500;
+    margin-left: 0.5rem;
+}
+
+.task-card-body {
+    margin-bottom: 0.75rem;
+    flex: 1; /* Permite que el cuerpo crezca según el contenido */
+}
+
+.task-card-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-bottom: 0.75rem;
+}
+
+.task-card-client {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0.6rem;
+    background: rgba(30, 58, 95, 0.1);
+    border-radius: 6px;
+    font-size: 0.8rem;
+    color: #1e3a5f;
+    font-weight: 500;
+}
+
+.task-card-date {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.4rem 0.8rem;
+    background: #f8f9fa;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    color: #495057;
+}
+
+.task-card-user {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.4rem;
+    padding: 0.3rem 0.6rem;
+    background: #e9ecef;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    color: #6c757d;
+}
+
+.task-card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding-top: 0.75rem;
+    border-top: 1px solid #e8e8e8;
+    gap: 0.4rem;
+    margin-top: auto; /* Empuja el footer hacia abajo */
+    position: relative; /* Para que el dropdown se posicione correctamente */
+}
+
+.task-card-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+    align-items: center;
+    width: 100%;
+    justify-content: space-between;
+    position: relative; /* Para que el dropdown se posicione correctamente */
+    z-index: 1; /* Establecer stacking context */
+}
+
+/* Dropdown de acciones */
+.dropdown-actions {
+    position: relative;
+    display: inline-block;
+    z-index: 99999;
+}
+
+.dropdown-toggle {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    position: relative;
+    z-index: 99999;
+}
+
+.dropdown-arrow {
+    font-size: 0.7rem;
+    transition: transform 0.3s ease;
+}
+
+.dropdown-menu {
+    display: none;
+    position: absolute;
+    bottom: 100%;
+    left: 0;
+    margin-bottom: 0.5rem;
+    background: white;
+    border-radius: 8px;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(0, 0, 0, 0.1);
+    min-width: 200px;
+    z-index: 999999;
+    overflow: hidden;
+}
+
+.dropdown-menu.show {
+    display: block;
+    animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+    from {
+        opacity: 0;
+        transform: translateY(-10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* Botones de acción en fila */
+.action-buttons-row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+}
+
+.btn-action-icon {
+    width: 28px;
+    height: 28px;
+    padding: 0;
+    border: none;
+    border-radius: 5px;
+    font-size: 1rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.2s ease;
+    background: rgba(255, 255, 255, 0.9);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    position: relative;
+}
+
+.btn-action-icon:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.15);
+    background: white;
+}
+
+.btn-action-icon:active {
+    transform: translateY(0);
+}
+
+.btn-solution-icon:hover {
+    background: linear-gradient(135deg, #f0f7ff 0%, #e3f2fd 100%);
+}
+
+.btn-edit-icon {
+    background: linear-gradient(135deg, #fff3cd 0%, #ffeaa7 100%);
+}
+
+.btn-edit-icon:hover {
+    background: linear-gradient(135deg, #ffeaa7 0%, #fdcb6e 100%);
+}
+
+.btn-google-calendar-icon:hover {
+    background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
+}
+
+.btn-success-icon:hover {
+    background: linear-gradient(135deg, #e8f5e9 0%, #c8e6c9 100%);
+}
+
+.btn-danger-icon:hover {
+    background: linear-gradient(135deg, #ffebee 0%, #ffcdd2 100%);
+}
+
+.btn-images-icon:hover {
+    background: linear-gradient(135deg, #f3e5f5 0%, #e1bee7 100%);
+}
+
+/* Tooltip mejorado */
+.btn-action-icon[title] {
+    position: relative;
+}
+
+.btn-action-icon[title]:hover::after {
+    content: attr(title);
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-bottom: 5px;
+    padding: 0.4rem 0.6rem;
+    background: rgba(0, 0, 0, 0.85);
+    color: white;
+    font-size: 0.75rem;
+    border-radius: 4px;
+    white-space: nowrap;
+    z-index: 1000000;
+    pointer-events: none;
+    animation: fadeInTooltip 0.2s ease;
+}
+
+.btn-action-icon[title]:hover::before {
+    content: '';
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    margin-bottom: -1px;
+    border: 4px solid transparent;
+    border-top-color: rgba(0, 0, 0, 0.85);
+    z-index: 1000000;
+    pointer-events: none;
+}
+
+@keyframes fadeInTooltip {
+    from {
+        opacity: 0;
+        transform: translateX(-50%) translateY(5px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(-50%) translateY(0);
+    }
+}
+
+.dropdown-item {
+    display: block;
+    width: 100%;
+    padding: 0.75rem 1rem;
+    text-align: left;
+    border: none;
+    background: white;
+    color: #333;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    border-radius: 0;
+    box-shadow: none;
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.dropdown-item:hover {
+    background: #f8f9fa;
+    transform: none;
+    box-shadow: none;
+}
+
+.dropdown-item.btn-danger {
+    color: #e74c3c;
+}
+
+.dropdown-item.btn-danger:hover {
+    background: #fee;
+    color: #c0392b;
+}
+
+.dropdown-item.btn-success {
+    color: #27ae60;
+}
+
+.dropdown-item.btn-success:hover {
+    background: #efe;
+    color: #229954;
+}
+
+.dropdown-item.btn-secondary {
+    color: #6c757d;
+}
+
+.dropdown-item.btn-secondary:hover {
+    background: #f8f9fa;
+    color: #495057;
+}
+
+.dropdown-item.btn-solution {
+    color: #1e3a5f;
+}
+
+.dropdown-item.btn-solution:hover {
+    background: rgba(30, 58, 95, 0.1);
+    color: #1e3a5f;
+}
+
+.dropdown-item.btn-google-calendar {
+    color: #EA4335;
+}
+
+.dropdown-item.btn-google-calendar:hover {
+    background: rgba(234, 67, 53, 0.1);
+    color: #EA4335;
+}
+
+.dropdown-item form {
+    margin: 0;
+}
+
+.dropdown-item svg {
+    vertical-align: middle;
+    margin-right: 0.5rem;
+}
+
+/* Tables (mantener para compatibilidad) */
+.table {
+    width: 100%;
+    border-collapse: collapse;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    overflow: hidden;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+}
+
+.table thead {
+    background: #1e3a5f;
+    color: white;
+}
+
+.table th,
+.table td {
+    padding: 1rem;
+    text-align: left;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.table tbody tr {
+    transition: all 0.2s ease;
+}
+
+.table tbody tr:hover {
+    background-color: rgba(30, 58, 95, 0.05);
+    transform: scale(1.01);
+}
+
+/* Badges */
+.status-badge,
+.priority-badge {
+    padding: 0.2rem 0.4rem;
+    border-radius: 10px;
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.2px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.15rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+.status-open {
+    background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+    color: white;
+}
+
+.status-completed {
+    background: linear-gradient(135deg, #27ae60 0%, #229954 100%);
+    color: white;
+}
+
+.status-cancelled {
+    background: linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%);
+    color: white;
+}
+
+.priority-urgent {
+    background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+    color: white;
+}
+
+.priority-high {
+    background: linear-gradient(135deg, #e67e22 0%, #d35400 100%);
+    color: white;
+}
+
+.priority-normal {
+    background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+    color: white;
+}
+
+.priority-low {
+    background: linear-gradient(135deg, #27ae60 0%, #229954 100%);
+    color: white;
+}
+
+/* Category badges */
+.category-badge {
+    padding: 0.2rem 0.4rem;
+    border-radius: 10px;
+    font-size: 0.65rem;
+    font-weight: 600;
+    text-transform: capitalize;
+    letter-spacing: 0.2px;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.15rem;
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+}
+
+/* Estilos para categorías - ahora se aplican dinámicamente desde la BD */
+.category-badge {
+    background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+    color: white;
+}
+
+/* Mantener compatibilidad con categorías antiguas si existen */
+.category-administracion {
+    background: linear-gradient(135deg, #2ecc71 0%, #27ae60 100%);
+    color: white;
+}
+
+.category-ideas {
+    background: linear-gradient(135deg, #9b59b6 0%, #8e44ad 100%);
+    color: white;
+}
+
+.category-incidencias {
+    background: linear-gradient(135deg, #e74c3c 0%, #c0392b 100%);
+    color: white;
+}
+
+.category-reclamaciones {
+    background: linear-gradient(135deg, #e67e22 0%, #d35400 100%);
+    color: white;
+}
+
+.category-presupuestos {
+    background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+    color: white;
+}
+
+.category-visitas {
+    background: linear-gradient(135deg, #3498db 0%, #2980b9 100%);
+    color: white;
+}
+
+.category-en_espera {
+    background: linear-gradient(135deg, #95a5a6 0%, #7f8c8d 100%);
+    color: white;
+}
+
+.category-delegado {
+    background: linear-gradient(135deg, #16a085 0%, #138d75 100%);
+    color: white;
+}
+
+.category-llamar {
+    background: linear-gradient(135deg, #e91e63 0%, #c2185b 100%);
+    color: white;
+}
+
+.category-personal {
+    background: linear-gradient(135deg, #34495e 0%, #2c3e50 100%);
+    color: white;
+}
+
+/* Slider para tareas sin fecha */
+.tasks-slider {
+    position: relative;
+    width: 100%;
+    overflow-x: hidden;
+    overflow-y: visible;
+}
+
+.slider-container {
+    position: relative;
+    width: 100%;
+    overflow-x: hidden;
+    overflow-y: visible;
+    padding: 0 2.5rem;
+}
+
+.slider-track {
+    display: flex;
+    gap: 1rem;
+    overflow-x: auto;
+    scroll-behavior: smooth;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE and Edge */
+    padding: 0.5rem 0;
+}
+
+.slider-track::-webkit-scrollbar {
+    display: none; /* Chrome, Safari, Opera */
+}
+
+.task-card-slide {
+    flex: 0 0 auto;
+    width: 280px;
+    min-width: 280px;
+    position: relative;
+    z-index: 1;
+}
+
+.task-card-slide .task-card {
+    padding: 0.75rem;
+    font-size: 0.85rem;
+    min-height: auto;
+}
+
+.task-card-slide .task-card-header {
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.5rem;
+}
+
+.task-card-slide .task-card-title {
+    font-size: 0.9rem;
+    line-height: 1.3;
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.task-card-slide .task-card:has(.task-card-title:hover) {
+    transform: scale(1.05) translateY(-4px);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
+    z-index: 10;
+    position: relative;
+}
+
+.task-card-slide .task-card-id {
+    font-size: 0.7rem;
+}
+
+.task-card-slide .task-card-body {
+    margin-bottom: 0.5rem;
+}
+
+.task-card-slide .task-card-meta {
+    gap: 0.4rem;
+    margin-bottom: 0.5rem;
+}
+
+.task-card-slide .task-card-client,
+.task-card-slide .task-card-date,
+.task-card-slide .task-card-user {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.75rem;
+}
+
+.task-card-slide .task-ampliacion {
+    padding: 0.5rem !important;
+    margin-bottom: 0.5rem !important;
+}
+
+.task-card-slide .task-ampliacion p {
+    margin: 0.25rem 0 0 0 !important;
+    font-size: 0.8rem !important;
+}
+
+.task-card-slide .task-solution {
+    padding: 0.5rem !important;
+    margin-top: 0.5rem !important;
+}
+
+.task-card-slide .task-solution p {
+    margin: 0.25rem 0 0 0 !important;
+    font-size: 0.8rem !important;
+}
+
+.task-card-slide .task-card-footer {
+    padding-top: 0.5rem;
+    border-top-width: 1px;
+}
+
+.task-card-slide .task-card-actions {
+    gap: 0.3rem;
+}
+
+.slider-btn {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    background: rgba(255, 255, 255, 0.95);
+    border: none;
+    border-radius: 50%;
+    width: 2.5rem;
+    height: 2.5rem;
+    font-size: 1.5rem;
+    cursor: pointer;
+    z-index: 10;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+    transition: all 0.3s ease;
+    color: #1e3a5f;
+    font-weight: bold;
+}
+
+.slider-btn:hover {
+    background: white;
+    box-shadow: 0 6px 16px rgba(0, 0, 0, 0.3);
+    transform: translateY(-50%) scale(1.1);
+}
+
+.slider-btn-prev {
+    left: 0;
+}
+
+.slider-btn-next {
+    right: 0;
+}
+
+/* Create Form */
+.create-form {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 4px;
+    margin-bottom: 2rem;
+}
+
+.create-form h3 {
+    margin-bottom: 1rem;
+}
+
+/* Modal */
+.modal {
+    position: fixed;
+    z-index: 100000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    background-color: rgba(0, 0, 0, 0.5);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 1rem;
+    box-sizing: border-box;
+}
+
+.modal-content {
+    background-color: white;
+    padding: 1.5rem;
+    border-radius: 12px;
+    max-width: 700px;
+    width: 100%;
+    max-height: 90vh;
+    position: relative;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+    overflow-y: auto;
+    margin: auto;
+}
+
+.close {
+    position: absolute;
+    right: 1rem;
+    top: 1rem;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #999;
+}
+
+.close:hover {
+    color: #333;
+}
+
+/* Tasks List */
+.tasks-list {
+    background: transparent;
+    padding: 0;
+    position: relative;
+    overflow: visible;
+}
+
+.no-date-section {
+    position: relative;
+    z-index: 1;
+}
+
+.with-date-section {
+    position: relative;
+    z-index: 0;
+}
+
+h2 {
+    color: white;
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 1rem;
+    text-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+    letter-spacing: -0.5px;
+}
+
+.empty-state {
+    background: rgba(255, 255, 255, 0.98);
+    backdrop-filter: blur(10px);
+    padding: 3rem;
+    border-radius: 12px;
+    text-align: center;
+    color: #6c757d;
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+    border: 1px solid rgba(0, 0, 0, 0.05);
+}
+
+.empty-state-icon {
+    font-size: 4rem;
+    margin-bottom: 1rem;
+    opacity: 0.5;
+}
+
+/* ========== ESTILOS MÓVILES PARA EL DOCK ========== */
+@media (max-width: 768px) {
+    /* Ajustes del contenedor del dock en móvil */
+    .filter-form {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .dock-container {
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        justify-content: center;
+        padding: 0.4rem 0.5rem;
+    }
+
+    /* Ocultar botones no deseados en móvil */
+    .dock-item[data-filter="view_mode"],
+    .dock-item[data-filter="status"],
+    .dock-item[data-filter="user_id"],
+    .dock-item[data-filter="task_date"] {
+        display: none;
+    }
+
+    /* Ocultar el botón de editar categorías */
+    .dock-item.dock-action a[href*="categories"],
+    .dock-item.dock-action a[href*="categories"] ~ *,
+    .dock-item.dock-action:has(a[href*="categories"]) {
+        display: none !important;
+    }
+
+    /* Botones del dock más pequeños en móvil */
+    .dock-button {
+        width: 40px;
+        height: 40px;
+    }
+
+    .dock-icon {
+        font-size: 1.2rem;
+    }
+
+    /* Logo más pequeño en móvil */
+    .logo-container {
+        width: 44px;
+        height: 44px;
+    }
+
+    .logo-img {
+        height: 28px;
+    }
+
+    /* Menú desplegable ajustado para móvil */
+    .dock-menu-content {
+        min-width: 160px;
+        max-width: calc(100vw - 40px);
+        font-size: 0.85rem;
+    }
+
+    .dock-option {
+        padding: 0.6rem 0.8rem;
+        font-size: 0.85rem;
+    }
+
+    /* Tooltip oculto en móvil */
+    .dock-tooltip {
+        display: none;
+    }
+
+    /* Ajustes del filtro sticky en móvil */
+    .filters {
+        padding: 0.5rem;
+    }
+}
+
