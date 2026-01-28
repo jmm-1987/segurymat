@@ -120,12 +120,6 @@ class TelegramBotHandler:
             await self._handle_create_task(update, context, parsed, user)
             return
         
-        # Verificar si el usuario está esperando prioridad
-        if user_state and user_state.get('action') == 'waiting_priority':
-            # Procesar respuesta de prioridad
-            await self._handle_priority_response(update, context, text, user)
-            return
-        
         # Verificar si el usuario está esperando categoría
         if user_state and user_state.get('action') == 'waiting_category':
             # Procesar respuesta de categoría
@@ -390,64 +384,11 @@ class TelegramBotHandler:
                     reply_markup=reply_markup
                 )
     
-    async def _ask_priority(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Pregunta por la prioridad de la tarea"""
-        keyboard = [
-            [
-                InlineKeyboardButton("🔴 Urgente", callback_data="priority:urgent"),
-                InlineKeyboardButton("🟡 Normal", callback_data="priority:normal")
-            ]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        reply_keyboard = self._get_reply_keyboard()
-        
-        if hasattr(update, 'message') and update.message:
-            await update.message.reply_text(
-                "⚡ ¿Cuál es la prioridad de esta tarea?",
-                reply_markup=reply_markup
-            )
-        elif context and hasattr(context, 'message'):
-            await context.message.reply_text(
-                "⚡ ¿Cuál es la prioridad de esta tarea?",
-                reply_markup=reply_markup
-            )
-        else:
-            if hasattr(update, 'effective_message'):
-                await update.effective_message.reply_text(
-                    "⚡ ¿Cuál es la prioridad de esta tarea?",
-                    reply_markup=reply_markup
-                )
-            elif hasattr(update, 'callback_query') and update.callback_query:
-                await update.callback_query.edit_message_text(
-                    "⚡ ¿Cuál es la prioridad de esta tarea?",
-                    reply_markup=reply_markup
-                )
-    
-    async def _handle_priority_response(self, update: Update, context: ContextTypes.DEFAULT_TYPE,
-                                       priority: str, user):
-        """Maneja la respuesta de prioridad y crea la tarea"""
-        user_state = self.user_states.get(user.id)
-        if not user_state or user_state.get('action') != 'waiting_priority':
-            return
-        
-        # Validar prioridad
-        if priority not in ['urgent', 'normal']:
-            priority = 'normal'
-        
-        # Actualizar prioridad en el estado
-        user_state['priority'] = priority
-        category = user_state.get('category')
-        
-        if not category:
-            await update.message.reply_text(
-                "❌ Error: No se encontró la categoría.",
-                reply_markup=self._get_reply_keyboard()
-            )
-            return
-        
-        # Crear tarea con categoría y prioridad
-        await self._create_task_with_category(update, context, user, category, user_state)
+    # NOTA: Las funciones _ask_priority y _handle_priority_response han sido eliminadas
+    # La prioridad ahora se detecta automáticamente del audio:
+    # - Si se menciona "urgente" → priority = 'urgent'
+    # - Si no se menciona → priority = 'normal' (por defecto)
+    # No se pregunta al usuario sobre la prioridad
     
     async def _handle_category_response(self, update: Update, context: ContextTypes.DEFAULT_TYPE,
                                        transcript: str, user):
@@ -1088,42 +1029,9 @@ class TelegramBotHandler:
                 await query.edit_message_text("❌ Error: Estado no válido.")
         
         elif action == 'priority':
-            priority = parts[1]
-            user = update.effective_user
-            user_state = self.user_states.get(user.id)
-            
-            if user_state and user_state.get('action') == 'waiting_priority':
-                # Validar prioridad
-                if priority not in ['urgent', 'normal']:
-                    priority = 'normal'
-                
-                # Actualizar prioridad en el estado
-                user_state['priority'] = priority
-                category = user_state.get('category')
-                
-                if not category:
-                    await query.edit_message_text("❌ Error: No se encontró la categoría.")
-                    return
-                
-                # Mostrar confirmación de prioridad seleccionada
-                priority_emoji = "🔴" if priority == 'urgent' else "🟡"
-                priority_text = "Urgente" if priority == 'urgent' else "Normal"
-                await query.edit_message_text(
-                    f"✅ Prioridad seleccionada: {priority_emoji} {priority_text}\n\n"
-                    f"⏳ Creando tarea..."
-                )
-                
-                # Crear un objeto Update simulado para pasar al método
-                class FakeUpdate:
-                    def __init__(self, callback_query):
-                        self.callback_query = callback_query
-                        self.effective_user = callback_query.from_user
-                        self.effective_message = callback_query.message
-                
-                fake_update = FakeUpdate(query)
-                await self._create_task_with_category(fake_update, context, user, category, user_state)
-            else:
-                await query.edit_message_text("❌ Error: Estado no válido.")
+            # Prioridad ya no se pregunta, se detecta automáticamente del audio
+            # Este callback ya no debería ejecutarse, pero lo dejamos por compatibilidad
+            await query.edit_message_text("ℹ️ La prioridad se detecta automáticamente del audio. Si no se menciona 'urgente', se usa 'normal' por defecto.")
         
         elif action == 'image_action':
             # Manejar acción de imagen: attach_existing o create_new
@@ -1849,7 +1757,6 @@ class TelegramBotHandler:
         # Mapeo de acciones a mensajes descriptivos
         action_messages = {
             'waiting_category': 'selección de categoría',
-            'waiting_priority': 'selección de prioridad',
             'ampliar_task': 'ampliación de tarea',
             'creating_task_with_image': 'creación de tarea con imagen',
             'waiting_image_action': 'acción de imagen',

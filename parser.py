@@ -278,25 +278,65 @@ class IntentParser:
         """Extrae fecha del texto usando dateparser"""
         text_lower = text.lower()
         
-        # Primero buscar días de la semana con regex más flexible
-        # Buscar patrones como "el lunes", "lunes", "el próximo lunes", etc.
-        weekday_pattern = r'\b(?:el\s+)?(?:próximo|proximo|siguiente)?\s*(lunes|martes|mi[ée]rcoles|jueves|viernes|s[áa]bado|domingo)\b'
-        weekday_match = re.search(weekday_pattern, text_lower)
-        
-        if weekday_match:
-            weekday_name = weekday_match.group(1)
-            # Normalizar (quitar tildes para comparación)
+        # 1. Detectar "este lunes", "este miércoles", etc. → día más próximo (incluso si ya pasó esta semana)
+        este_pattern = r'\beste\s+(lunes|martes|mi[ée]rcoles|jueves|viernes|s[áa]bado|domingo)\b'
+        este_match = re.search(este_pattern, text_lower)
+        if este_match:
+            weekday_name = este_match.group(1)
             weekday_name_normalized = weekday_name.replace('á', 'a').replace('é', 'e')
-            
-            # Buscar en el mapeo
             weekday_num = None
             for key, value in self.WEEKDAY_MAP.items():
                 if key.replace('á', 'a').replace('é', 'e') == weekday_name_normalized:
                     weekday_num = value
                     break
-            
             if weekday_num is not None:
-                return _next_weekday(weekday_num)
+                # "este [día]" siempre es el más próximo, incluso si ya pasó esta semana
+                return _next_weekday(weekday_num, force_next=True)
+        
+        # 2. Detectar "[día] de la semana que viene" → siguiente semana
+        semana_que_viene_pattern = r'\b(lunes|martes|mi[ée]rcoles|jueves|viernes|s[áa]bado|domingo)\s+de\s+la\s+semana\s+que\s+viene\b'
+        semana_match = re.search(semana_que_viene_pattern, text_lower)
+        if semana_match:
+            weekday_name = semana_match.group(1)
+            weekday_name_normalized = weekday_name.replace('á', 'a').replace('é', 'e')
+            weekday_num = None
+            for key, value in self.WEEKDAY_MAP.items():
+                if key.replace('á', 'a').replace('é', 'e') == weekday_name_normalized:
+                    weekday_num = value
+                    break
+            if weekday_num is not None:
+                # "de la semana que viene" siempre es la siguiente semana
+                return _next_weekday_in_next_week(weekday_num)
+        
+        # 3. Detectar "próximo [día]", "siguiente [día]" → siguiente ocurrencia
+        proximo_pattern = r'\b(?:próximo|proximo|siguiente)\s+(lunes|martes|mi[ée]rcoles|jueves|viernes|s[áa]bado|domingo)\b'
+        proximo_match = re.search(proximo_pattern, text_lower)
+        if proximo_match:
+            weekday_name = proximo_match.group(1)
+            weekday_name_normalized = weekday_name.replace('á', 'a').replace('é', 'e')
+            weekday_num = None
+            for key, value in self.WEEKDAY_MAP.items():
+                if key.replace('á', 'a').replace('é', 'e') == weekday_name_normalized:
+                    weekday_num = value
+                    break
+            if weekday_num is not None:
+                # "próximo/siguiente [día]" siempre es el siguiente, incluso si hoy es ese día
+                return _next_weekday(weekday_num, force_next=True)
+        
+        # 4. Detectar "el lunes", "lunes" (sin modificadores) → próximo día de esa semana
+        weekday_pattern = r'\b(?:el\s+)?(lunes|martes|mi[ée]rcoles|jueves|viernes|s[áa]bado|domingo)\b'
+        weekday_match = re.search(weekday_pattern, text_lower)
+        if weekday_match:
+            weekday_name = weekday_match.group(1)
+            weekday_name_normalized = weekday_name.replace('á', 'a').replace('é', 'e')
+            weekday_num = None
+            for key, value in self.WEEKDAY_MAP.items():
+                if key.replace('á', 'a').replace('é', 'e') == weekday_name_normalized:
+                    weekday_num = value
+                    break
+            if weekday_num is not None:
+                # "el [día]" o "[día]" sin modificadores → próximo día más cercano
+                return _next_weekday(weekday_num, force_next=False)
         
         # Verificar patrones relativos comunes
         for pattern, date_func in self.DATE_PATTERNS.items():
@@ -360,10 +400,12 @@ REGLAS CRÍTICAS:
 FECHAS:
 - "mañana" = fecha de mañana
 - "hoy" = fecha de hoy
-- "el lunes/martes/etc" = próximo día de esa semana (o hoy si es ese día)
+- "este lunes/martes/etc" = el lunes/martes/etc MÁS PRÓXIMO (incluso si ya pasó esta semana)
+- "el lunes/martes/etc" o "lunes/martes/etc" (sin modificadores) = próximo día de esa semana (o hoy si es ese día)
+- "próximo [día]" o "siguiente [día]" = siempre el siguiente día, incluso si hoy es ese día
+- "[día] de la semana que viene" = siempre el día de la SIGUIENTE semana (no esta semana)
 - "esta semana" = fecha de hoy
 - "próxima semana" = fecha dentro de 7 días
-- "próximo [día de la semana]" o "siguiente [día de la semana]" o "[día de la semana] de la semana que viene" = siempre el siguiente día de la semana mencionado.
 - SIEMPRE usa fechas FUTURAS (hoy o después)
 - La fecha actual es: """ + fecha_actual.strftime('%Y-%m-%d') + """
 - Mañana es: """ + fecha_mañana + """
@@ -487,14 +529,45 @@ Texto a analizar: {text}"""
 def _next_weekday(weekday: int, force_next: bool = False) -> datetime:
     """
     Obtiene el día de la semana más próximo (0=lunes, 6=domingo)
-    Si hoy es ese día, devuelve hoy. Si no, devuelve el próximo.
-    Si force_next es True, siempre devuelve el próximo día, incluso si hoy es ese día.
+    - Si force_next=False: Si hoy es ese día, devuelve hoy. Si ya pasó esta semana, devuelve el próximo.
+    - Si force_next=True: Siempre devuelve el próximo día, incluso si hoy es ese día.
     """
     today = datetime.now()
     current_weekday = today.weekday()
     days_ahead = weekday - current_weekday
     
-    if days_ahead < 0 or (days_ahead == 0 and force_next):
+    if days_ahead < 0:
+        # Ya pasó esta semana, ir a la próxima semana
+        days_ahead += 7
+    elif days_ahead == 0:
+        # Es hoy
+        if force_next:
+            # Forzar siguiente semana
+            days_ahead = 7
+        # Si no force_next, days_ahead = 0 (hoy)
+    
+    result_date = (today + timedelta(days=days_ahead)).replace(hour=9, minute=0, second=0, microsecond=0)
+    return result_date
+
+
+def _next_weekday_in_next_week(weekday: int) -> datetime:
+    """
+    Obtiene el día de la semana de la PRÓXIMA semana (0=lunes, 6=domingo)
+    Siempre devuelve el día de la semana que viene, incluso si hoy es ese día.
+    """
+    today = datetime.now()
+    current_weekday = today.weekday()
+    days_ahead = weekday - current_weekday
+    
+    # Siempre sumar 7 días para ir a la siguiente semana
+    if days_ahead < 0:
+        # Ya pasó esta semana, sumar 7 para ir a la próxima
+        days_ahead += 7
+    elif days_ahead == 0:
+        # Es hoy, sumar 7 para ir a la próxima semana
+        days_ahead = 7
+    else:
+        # Es un día futuro de esta semana, sumar 7 para ir a la próxima semana
         days_ahead += 7
     
     result_date = (today + timedelta(days=days_ahead)).replace(hour=9, minute=0, second=0, microsecond=0)
