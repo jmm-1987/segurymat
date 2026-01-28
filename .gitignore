@@ -68,3 +68,4 @@ tmp/task_images/*
 # Mantener estructura de directorios
 !data/.gitkeep
 
+
