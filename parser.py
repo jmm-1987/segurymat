@@ -373,6 +373,24 @@ class IntentParser:
         
         return 'normal'
     
+    def _get_category_synonyms(self, category_name: str) -> List[str]:
+        """Retorna sinónimos y palabras clave para una categoría"""
+        synonyms_map = {
+            'personal': ['personal', 'privado', 'mío', 'propio'],
+            'delegado': ['delegar', 'delegado', 'asignar', 'encargar', 'pasar a'],
+            'en_espera': ['espera', 'esperando', 'pendiente', 'a la espera', 'esperar'],
+            'ideas': ['idea', 'ideas', 'sugerencia', 'sugerencias', 'propuesta', 'propuestas', 'mejora', 'mejoras'],
+            'llamar': ['llamar', 'llamada', 'llamadas', 'telefonear', 'contactar por teléfono', 'hablar por teléfono'],
+            'presupuestos': ['presupuesto', 'presupuestos', 'cotización', 'cotizaciones', 'precio', 'precios', 'coste', 'costes'],
+            'visitas': ['visita', 'visitas', 'ir a ver', 'reunión presencial', 'cita', 'citas'],
+            'administracion': ['administración', 'admin', 'administrativo', 'papeles', 'documentación', 'trámite', 'trámites'],
+            'reclamaciones': ['reclamación', 'reclamaciones', 'queja', 'quejas', 'reclamo', 'reclamos'],
+            'calidad': ['calidad', 'control calidad', 'qc', 'aseguramiento calidad'],
+            'comercial': ['comercial', 'ventas', 'venta', 'cliente nuevo', 'prospección'],
+            'incidencias': ['incidencia', 'incidencias', 'problema', 'problemas', 'fallo', 'fallos', 'error', 'errores', 'bug', 'bugs']
+        }
+        return synonyms_map.get(category_name, [category_name])
+    
     def _extract_entities_with_openai(self, text: str) -> Dict:
         """Extrae entidades usando GPT-4o-mini"""
         import logging
@@ -385,18 +403,62 @@ class IntentParser:
         categories = self.db.get_all_categories()
         category_names = [cat['name'] for cat in categories]
         
+        # Crear mapeo de categorías con sus nombres de visualización y sinónimos
+        category_info = {}
+        for cat in categories:
+            category_info[cat['name']] = {
+                'display_name': cat.get('display_name', cat['name']),
+                'icon': cat.get('icon', ''),
+                'synonyms': self._get_category_synonyms(cat['name'])
+            }
+        
         # Fecha actual para contexto
         fecha_actual = datetime.now()
         fecha_mañana = (fecha_actual + timedelta(days=1)).strftime('%Y-%m-%d')
         
-        system_prompt = """Eres un asistente experto en extraer información estructurada de mensajes sobre tareas en español.
+        # Construir lista detallada de categorías para el prompt
+        categories_list = []
+        for cat_name in category_names:
+            info = category_info[cat_name]
+            synonyms_str = ', '.join(info['synonyms'])
+            categories_list.append(
+                f"- '{cat_name}' ({info['display_name']}): Busca palabras como: {synonyms_str}"
+            )
+        categories_text = '\n'.join(categories_list)
+        
+        system_prompt = f"""Eres un asistente experto en extraer información estructurada de mensajes sobre tareas en español.
+
 TU TAREA es analizar el texto y extraer SIEMPRE estos campos:
 1. CATEGORÍA: Debe ser EXACTAMENTE una de las categorías disponibles (usa el nombre exacto)
 2. PRIORIDAD: SOLO "urgent" o "normal" (si no se menciona "urgente", usa "normal")
 3. FECHA: Si se menciona "mañana", "hoy", "el lunes", etc., conviértela a formato ISO (YYYY-MM-DD)
 4. TÍTULO: Un resumen corto y claro de la tarea
 
-REGLAS CRÍTICAS:
+REGLAS CRÍTICAS PARA CATEGORÍAS (MUY IMPORTANTE):
+Las categorías disponibles son EXACTAMENTE estas (usa SOLO estos nombres exactos):
+{categories_text}
+
+INSTRUCCIONES PARA CATEGORÍAS:
+1. Analiza el texto buscando palabras clave relacionadas con cada categoría
+2. Si encuentras palabras relacionadas con una categoría, usa el NOMBRE EXACTO de esa categoría
+3. Si el texto menciona múltiples categorías posibles, elige la MÁS RELEVANTE según el contexto
+4. Si NO encuentras ninguna relación clara, devuelve null (no inventes categorías)
+5. IMPORTANTE: El nombre debe ser EXACTAMENTE uno de los nombres listados arriba, sin espacios extra ni mayúsculas
+
+EJEMPLOS DE MATCHING:
+- "tengo que llamar" → "llamar"
+- "hacer una visita" → "visitas"
+- "presupuesto para cliente" → "presupuestos"
+- "reclamación del cliente" → "reclamaciones"
+- "incidencia técnica" → "incidencias"
+- "tarea de administración" → "administracion"
+- "control de calidad" → "calidad"
+- "tarea comercial" → "comercial"
+- "idea para mejorar" → "ideas"
+- "tarea personal" → "personal"
+- "delegar a alguien" → "delegado"
+- "en espera de respuesta" → "en_espera"
+
 FECHAS:
 - "mañana" = fecha de mañana
 - "hoy" = fecha de hoy
@@ -407,46 +469,34 @@ FECHAS:
 - "esta semana" = fecha de hoy
 - "próxima semana" = fecha dentro de 7 días
 - SIEMPRE usa fechas FUTURAS (hoy o después)
-- La fecha actual es: """ + fecha_actual.strftime('%Y-%m-%d') + """
-- Mañana es: """ + fecha_mañana + """
+- La fecha actual es: {fecha_actual.strftime('%Y-%m-%d')}
+- Mañana es: {fecha_mañana}
 - NUNCA devuelvas fechas del pasado (antes de hoy)
 
-PRIORIDADES (MUY IMPORTANTE):
+PRIORIDADES:
 - SOLO devuelve "urgent" si el texto menciona EXPLÍCITAMENTE palabras como: "urgente", "urgent", "muy urgente", "es urgente", "urgente por favor"
 - Si NO se menciona ninguna palabra relacionada con urgente, SIEMPRE devuelve "normal"
 - NUNCA preguntes ni devuelvas null para prioridad, SIEMPRE debe ser "urgent" o "normal"
 - Por defecto, SIEMPRE usa "normal" a menos que se mencione explícitamente "urgente"
 
-CATEGORÍAS:
-- Debes elegir UNA de las categorías disponibles
-- Las categorías disponibles son: personal, delegado, en_espera, ideas, llamar, presupuestos, visitas, administracion, reclamaciones, calidad, comercial, incidencias
-- Si el texto menciona algo relacionado con una categoría, úsala
-- Variaciones comunes:
-  * "idea" o "ideas" → ideas
-  * "incidencia" o "incidencias" → incidencias
-  * "reclamación" o "reclamaciones" → reclamaciones
-  * "presupuesto" o "presupuestos" → presupuestos
-  * "visita" o "visitas" → visitas
-  * "administración" o "admin" → administracion
-  * "en espera" o "espera" → en_espera
-  * "llamada" o "llamar" → llamar
-  * "calidad" → calidad
-  * "comercial" → comercial
-- Si no está claro, elige la más apropiada o usa null
-
 Responde SOLO con un JSON válido (sin texto adicional):
-{
+{{
   "category": "nombre_exacto_categoria" o null,
-  "priority": "urgent|normal" o null,
+  "priority": "urgent" o "normal",
   "date": "YYYY-MM-DD" o null,
   "title": "resumen corto de la tarea" o null
-}
+}}
 
-IMPORTANTE: Responde SOLO con el JSON, sin explicaciones ni texto adicional."""
+IMPORTANTE: 
+- Responde SOLO con el JSON, sin explicaciones ni texto adicional
+- La categoría debe ser EXACTAMENTE uno de los nombres listados arriba o null
+- La prioridad SIEMPRE debe ser "urgent" o "normal", nunca null"""
         
-        user_prompt = f"""Categorías disponibles: {', '.join(category_names) if category_names else 'Ninguna'}
+        user_prompt = f"""Categorías disponibles (usa SOLO estos nombres exactos): {', '.join(category_names) if category_names else 'Ninguna'}
 
-Texto a analizar: {text}"""
+Texto a analizar: {text}
+
+Analiza el texto y extrae la categoría más apropiada. Si no encuentras ninguna relación clara, devuelve null para category."""
         
         try:
             from openai import OpenAI
@@ -493,8 +543,24 @@ Texto a analizar: {text}"""
                 # Por defecto siempre "normal" si no se menciona explícitamente urgente
                 priority = 'normal'
             
+            # Validar y normalizar categoría
+            category = result_json.get('category')
+            if category:
+                category = category.strip().lower()
+                # Verificar que la categoría existe en la base de datos
+                if category not in category_names:
+                    # Intentar encontrar la categoría más similar usando fuzzy matching
+                    from rapidfuzz import process
+                    match = process.extractOne(category, category_names, scorer=fuzz.ratio)
+                    if match and match[1] >= 80:  # Si la similitud es >= 80%
+                        category = match[0]
+                        logger.info(f"[OPENAI] Categoría '{result_json.get('category')}' normalizada a '{category}'")
+                    else:
+                        logger.warning(f"[OPENAI] Categoría '{category}' no encontrada en categorías disponibles. Descartando.")
+                        category = None
+            
             return {
-                'category': result_json.get('category'),
+                'category': category,
                 'priority': priority,
                 'date': parsed_date,
                 'title': result_json.get('title'),
