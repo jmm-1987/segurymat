@@ -749,7 +749,7 @@ curl -X POST "https://api.telegram.org/bot<TOKEN>/setWebhook" \
 ### Buenas Prácticas
 
 1. **Nunca commitear tokens o secretos**
-   - Usar `.env` y mantenerlo seguro
+   - Usar `.env` y `.gitignore`
    - Variables de entorno en producción
 
 2. **Webhook Secret**

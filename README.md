@@ -44,9 +44,11 @@ Descargar desde https://ffmpeg.org/download.html y añadir al PATH.
 
 ## Instalación Local
 
-1. **Descargar y extraer el proyecto:**
-   - Descarga el proyecto y extráelo en una carpeta local
-   - Navega a la carpeta del proyecto
+1. **Clonar repositorio:**
+```bash
+git clone <repo-url>
+cd agente
+```
 
 2. **Crear entorno virtual:**
 ```bash

@@ -419,15 +419,6 @@ body {
     transform: translateY(-5px) scale(1.1);
 }
 
-.dock-button-create {
-    background: linear-gradient(135deg, #2ecc71, #27ae60);
-}
-
-.dock-button-create:hover {
-    background: linear-gradient(135deg, #27ae60, #229954);
-    transform: translateY(-5px) scale(1.1);
-}
-
 .dock-action .dock-button {
     text-decoration: none;
     color: white;

@@ -456,24 +456,21 @@ class TelegramBotHandler:
         # Obtener categorías de la base de datos (ordenadas por nombre)
         categories = self.db.get_all_categories()
         
-        # Identificar las últimas 5 categorías (las que tendrán botones más oscuros)
-        # Las categorías vienen ordenadas alfabéticamente por nombre
-        # Las últimas 5 en orden alfabético son: llamar, personal, presupuestos, reclamaciones, visitas
-        total_categories = len(categories)
-        last_five_indices = set(range(max(0, total_categories - 5), total_categories))
+        # Categorías específicas que tendrán el emoji adicional (más oscuro visualmente)
+        marked_categories = {'administracion', 'calidad', 'incidencias', 'reclamaciones', 'comercial'}
         
         # Crear botones en columnas de 2
         keyboard = []
         row = []
-        for idx, category in enumerate(categories):
+        for category in categories:
             # Botones con icono y nombre
             button_text = f"{category['icon']} {category['display_name']}"
             
-            # Para las últimas 5 categorías, usar un estilo diferente (más oscuro visualmente)
+            # Para las categorías específicas, usar un estilo diferente (más oscuro visualmente)
             # Como Telegram no permite cambiar el color directamente, usamos un emoji adicional
             # que sugiere importancia o urgencia (🔸 para diferenciarlas visualmente)
-            if idx in last_five_indices:
-                # Para las últimas 5, añadimos un emoji adicional que las hace más visibles
+            if category['name'] in marked_categories:
+                # Para estas categorías específicas, añadimos un emoji adicional que las hace más visibles
                 button_text = f"🔸 {category['icon']} {category['display_name']}"
             
             row.append(InlineKeyboardButton(button_text, callback_data=f"category:{category['name']}"))
@@ -1456,20 +1453,19 @@ class TelegramBotHandler:
         # Obtener categorías de la base de datos (ordenadas por nombre)
         categories = self.db.get_all_categories()
         
-        # Identificar las últimas 5 categorías (las que tendrán botones más oscuros)
-        total_categories = len(categories)
-        last_five_indices = set(range(max(0, total_categories - 5), total_categories))
+        # Categorías específicas que tendrán el emoji adicional (más oscuro visualmente)
+        marked_categories = {'administracion', 'calidad', 'incidencias', 'reclamaciones', 'comercial'}
         
         # Crear botones en columnas de 2
         keyboard = []
         row = []
-        for idx, category in enumerate(categories):
+        for category in categories:
             button_text = f"{category['icon']} {category['display_name']}"
             
-            # Para las últimas 5 categorías, usar un estilo diferente (más oscuro visualmente)
+            # Para las categorías específicas, usar un estilo diferente (más oscuro visualmente)
             # Como Telegram no permite cambiar el color directamente, usamos un emoji adicional
-            if idx in last_five_indices:
-                # Para las últimas 5, añadimos un emoji adicional que las hace más visibles
+            if category['name'] in marked_categories:
+                # Para estas categorías específicas, añadimos un emoji adicional que las hace más visibles
                 button_text = f"🔸 {category['icon']} {category['display_name']}"
             
             row.append(InlineKeyboardButton(button_text, callback_data=f"category:{category['name']}"))

@@ -64,7 +64,7 @@ Keep your token secure and store it safely, it can be used by anyone to control 
 ## ⚠️ IMPORTANTE - Seguridad
 
 - **NUNCA** compartas tu token públicamente
-- **NUNCA** lo compartas en repositorios públicos o servicios en la nube
+- **NUNCA** lo subas a GitHub (ya está protegido con `.gitignore`)
 - Si accidentalmente lo compartes, usa `/revoke` en BotFather inmediatamente
 - El token es como una contraseña: quien lo tenga puede controlar tu bot
 
@@ -87,6 +87,8 @@ SECRET_KEY=clave-secreta-aleatoria
 
 **Para buscar el bot:**
 - Busca en Telegram: `@mi_agenda_bot`
+
+
 
 
 

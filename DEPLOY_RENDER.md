@@ -228,7 +228,7 @@ Para actualizar la aplicación:
 
 ## 🔒 Seguridad
 
-- ✅ **NUNCA** subas el archivo `.env` a repositorios públicos
+- ✅ **NUNCA** subas el archivo `.env` a Git (ya está en `.gitignore`)
 - ✅ Usa contraseñas seguras para `ADMIN_PASSWORD` y `SECRET_KEY`
 - ✅ Usa un `TELEGRAM_WEBHOOK_SECRET` aleatorio y seguro
 - ✅ Mantén tu token de Telegram privado
