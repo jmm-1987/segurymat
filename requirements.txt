@@ -4,6 +4,7 @@ faster-whisper>=1.2.1
 rapidfuzz==3.5.2
 dateparser==1.2.0
 gunicorn==21.2.0
+openai>=1.0.0
 
 # Google Calendar (opcional)
 google-auth==2.25.2
