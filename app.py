@@ -135,18 +135,58 @@ else:
 
 from werkzeug.security import generate_password_hash, check_password_hash
 
+# Variable global para rastrear si ya se inicializó el usuario maestro
+_master_user_initialized = False
+
 def init_master_user():
     """Inicializa el usuario maestro si no existe"""
-    db = database.db
-    master_user = db.get_web_user_by_username('master')
-    if not master_user:
-        # Crear usuario maestro con la contraseña del admin
-        password_hash = generate_password_hash(config.ADMIN_PASSWORD)
-        db.create_web_user('master', password_hash, 'Usuario Maestro', is_master=True)
-        logger.info("Usuario maestro creado automáticamente")
+    global _master_user_initialized
+    
+    try:
+        db = database.db
+        
+        # Asegurar que la base de datos esté inicializada
+        db.init_db()
+        
+        master_user = db.get_web_user_by_username('master')
+        if not master_user:
+            # Crear usuario maestro con la contraseña del admin
+            if not config.ADMIN_PASSWORD:
+                logger.error("ADMIN_PASSWORD no está configurado. No se puede crear usuario maestro.")
+                return False
+            
+            password_hash = generate_password_hash(config.ADMIN_PASSWORD)
+            user_id = db.create_web_user('master', password_hash, 'Usuario Maestro', is_master=True)
+            logger.info(f"✅ Usuario maestro creado automáticamente (ID: {user_id}, usuario: master)")
+            _master_user_initialized = True
+            return True
+        else:
+            # Verificar que el usuario esté activo
+            if not master_user.get('is_active'):
+                logger.warning("Usuario maestro existe pero está inactivo. Activando...")
+                db.update_web_user(master_user['id'], is_active=True)
+            
+            _master_user_initialized = True
+            logger.debug("Usuario maestro ya existe y está activo")
+            return True
+    except Exception as e:
+        logger.error(f"❌ Error inicializando usuario maestro: {e}", exc_info=True)
+        return False
 
-# Inicializar usuario maestro al arrancar
-init_master_user()
+# Hook de Flask que se ejecuta antes de cada request (solo la primera vez)
+@app.before_request
+def ensure_master_user():
+    """Asegura que el usuario maestro existe antes de cada request"""
+    global _master_user_initialized
+    if not _master_user_initialized:
+        init_master_user()
+
+# Inicializar usuario maestro al importar el módulo (para desarrollo local)
+try:
+    logger.info("🔧 Inicializando usuario maestro al arrancar aplicación...")
+    init_master_user()
+except Exception as e:
+    logger.error(f"❌ Error crítico al inicializar usuario maestro al arrancar: {e}", exc_info=True)
 
 def login_required(f):
     """Decorador para requerir login"""
@@ -180,6 +220,12 @@ def get_current_user():
 @app.route('/admin/login', methods=['GET', 'POST'])
 def login():
     """Login de usuarios"""
+    # Asegurar que el usuario maestro existe
+    try:
+        init_master_user()
+    except Exception as e:
+        logger.error(f"Error al verificar usuario maestro en login: {e}", exc_info=True)
+    
     if request.method == 'POST':
         username = request.form.get('username', '').strip()
         password = request.form.get('password', '')
@@ -190,14 +236,25 @@ def login():
         db = database.db
         user = db.get_web_user_by_username(username)
         
-        if user and user.get('is_active') and check_password_hash(user['password_hash'], password):
+        if not user:
+            logger.warning(f"Intento de login con usuario inexistente: {username}")
+            return render_template('login.html', error='Usuario o contraseña incorrectos')
+        
+        if not user.get('is_active'):
+            logger.warning(f"Intento de login con usuario inactivo: {username}")
+            return render_template('login.html', error='Usuario inactivo')
+        
+        # Verificar contraseña
+        if check_password_hash(user['password_hash'], password):
             session['user_id'] = user['id']
             session['username'] = user['username']
             session['is_master'] = user.get('is_master', False)
             session['full_name'] = user.get('full_name', username)
+            logger.info(f"Login exitoso para usuario: {username}")
             return redirect(url_for('tasks'))
-        
-        return render_template('login.html', error='Usuario o contraseña incorrectos')
+        else:
+            logger.warning(f"Contraseña incorrecta para usuario: {username}")
+            return render_template('login.html', error='Usuario o contraseña incorrectos')
     
     return render_template('login.html')
 
@@ -1240,18 +1297,132 @@ def api_clients():
     return jsonify({'clients': clients_list})
 
 
+# ========== ERROR HANDLERS ==========
+
+@app.errorhandler(500)
+def internal_error(error):
+    """Manejo de errores 500"""
+    logger.error(f"Error 500: {error}", exc_info=True)
+    return jsonify({'error': 'Error interno del servidor'}), 500
+
+@app.errorhandler(404)
+def not_found(error):
+    """Manejo de errores 404"""
+    return jsonify({'error': 'Recurso no encontrado'}), 404
+
 # ========== HEALTH CHECK ==========
 
 @app.route('/health')
 def health():
     """Health check"""
+    # Asegurar que el usuario maestro existe
+    try:
+        init_master_user()
+    except Exception as e:
+        logger.error(f"Error verificando usuario maestro en health check: {e}")
+    
+    try:
+        # Verificar que la base de datos esté accesible
+        db = database.db
+        db.get_connection().close()
+        db_status = 'ok'
+        
+        # Verificar usuario maestro
+        master_user = db.get_web_user_by_username('master')
+        master_status = 'exists' if master_user else 'missing'
+    except Exception as e:
+        logger.error(f"Error verificando base de datos: {e}")
+        db_status = f'error: {str(e)}'
+        master_status = 'unknown'
+    
     return jsonify({
         'status': 'ok',
         'telegram_configured': bool(config.TELEGRAM_BOT_TOKEN),
         'telegram_initialized': telegram_initialized,
         'calendar_configured': config.GOOGLE_CALENDAR_ENABLED,
-        'database_path': config.SQLITE_PATH
+        'database_path': config.SQLITE_PATH,
+        'database_status': db_status,
+        'master_user_status': master_status,
+        'admin_password_configured': bool(config.ADMIN_PASSWORD)
     })
+
+@app.route('/admin/reset-master', methods=['POST'])
+def reset_master_user():
+    """Endpoint para resetear/crear el usuario maestro (solo en desarrollo o con secreto)"""
+    # Verificar secreto si está en producción
+    secret = request.form.get('secret') or request.json.get('secret') if request.is_json else None
+    expected_secret = os.getenv('RESET_MASTER_SECRET', 'reset123')
+    
+    if secret != expected_secret:
+        return jsonify({'error': 'Secreto incorrecto'}), 403
+    
+    try:
+        db = database.db
+        
+        # Buscar usuario maestro existente
+        master_user = db.get_web_user_by_username('master')
+        
+        # Crear o actualizar contraseña
+        password_hash = generate_password_hash(config.ADMIN_PASSWORD)
+        
+        if master_user:
+            # Actualizar contraseña del usuario existente
+            db.update_web_user(
+                master_user['id'],
+                password_hash=password_hash,
+                is_active=True
+            )
+            logger.info("Usuario maestro actualizado")
+            return jsonify({
+                'success': True,
+                'message': 'Usuario maestro actualizado',
+                'username': 'master',
+                'password': config.ADMIN_PASSWORD
+            })
+        else:
+            # Crear nuevo usuario maestro
+            user_id = db.create_web_user('master', password_hash, 'Usuario Maestro', is_master=True)
+            logger.info(f"Usuario maestro creado con ID: {user_id}")
+            return jsonify({
+                'success': True,
+                'message': 'Usuario maestro creado',
+                'username': 'master',
+                'password': config.ADMIN_PASSWORD,
+                'user_id': user_id
+            })
+    except Exception as e:
+        logger.error(f"Error reseteando usuario maestro: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/admin/check-users')
+def check_users():
+    """Endpoint de diagnóstico para verificar usuarios (sin autenticación)"""
+    try:
+        db = database.db
+        users = db.get_all_web_users()
+        
+        # Ocultar contraseñas
+        users_info = []
+        for user in users:
+            users_info.append({
+                'id': user.get('id'),
+                'username': user.get('username'),
+                'full_name': user.get('full_name'),
+                'is_master': bool(user.get('is_master')),
+                'is_active': bool(user.get('is_active')),
+                'has_password': bool(user.get('password_hash'))
+            })
+        
+        return jsonify({
+            'success': True,
+            'total_users': len(users_info),
+            'users': users_info,
+            'admin_password_set': bool(config.ADMIN_PASSWORD),
+            'admin_password_length': len(config.ADMIN_PASSWORD) if config.ADMIN_PASSWORD else 0
+        })
+    except Exception as e:
+        logger.error(f"Error verificando usuarios: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/webhook/status')
 def webhook_status():
