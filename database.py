@@ -90,6 +90,19 @@ class Database:
             )
         ''')
         
+        # Tabla de historial de ampliaciones
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS task_ampliaciones_history (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                task_id INTEGER NOT NULL,
+                ampliacion_text TEXT NOT NULL,
+                user_name TEXT NOT NULL,
+                user_id INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
+            )
+        ''')
+        
         # Tabla de tareas
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS tasks (
@@ -685,6 +698,35 @@ class Database:
         # Verificar si el usuario tiene acceso a esta categoría
         categories = self.get_user_categories(user_id)
         return category_name in categories
+    
+    # ========== HISTORIAL DE AMPLIACIONES ==========
+    
+    def add_ampliacion_history(self, task_id: int, ampliacion_text: str, user_name: str, user_id: int = None) -> int:
+        """Añade una entrada al historial de ampliaciones"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO task_ampliaciones_history (task_id, ampliacion_text, user_name, user_id)
+            VALUES (?, ?, ?, ?)
+        ''', (task_id, ampliacion_text, user_name, user_id))
+        history_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        return history_id
+    
+    def get_task_ampliaciones_history(self, task_id: int) -> List[Dict]:
+        """Obtiene el historial de ampliaciones de una tarea"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT id, ampliacion_text, user_name, user_id, created_at
+            FROM task_ampliaciones_history
+            WHERE task_id = ?
+            ORDER BY created_at ASC
+        ''', (task_id,))
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(row) for row in rows]
 
 
 # Instancia global

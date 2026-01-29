@@ -78,6 +78,9 @@
                     📎
                 </button>
                 {% endif %}
+                <button type="button" class="btn-action-icon btn-ampliar-icon" data-task-id="{{ task.id }}" data-task-title="{{ task.title|e }}" onclick="openAmpliarModalFromButton(this)" title="Ampliar tarea">
+                    📝
+                </button>
                 <button type="button" class="btn-action-icon btn-solution-icon" data-task-id="{{ task.id }}" data-task-title="{{ task.title|e }}" data-solution="{{ task.solution|tojson|e if task.solution else '' }}" onclick="openSolutionModalFromButton(this)" title="{% if task.solution %}Editar Solución{% else %}Añadir Solución{% endif %}">
                     💡
                 </button>

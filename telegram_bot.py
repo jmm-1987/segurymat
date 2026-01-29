@@ -81,9 +81,16 @@ class TelegramBotHandler:
                 "  - 'Crear tarea llamar al cliente Alditraex mañana'\n"
                 "  - 'Listar tareas pendientes'\n"
                 "  - 'Da por hecha la tarea del cliente Alditraex'\n\n"
-                "💬 Puedes escribir o enviar un audio con tu comando.",
+                "💬 Puedes escribir o enviar un audio con tu comando.\n\n"
+                "👥 **Gestión de usuarios (solo master):**\n"
+                "• /usuarios - Gestionar usuarios del panel web",
                 reply_markup=reply_markup
             )
+            return
+        
+        # Comando de gestión de usuarios (solo para master)
+        if text_lower in ['/usuarios', '/users', 'usuarios', 'users']:
+            await self._handle_users_command(update, user)
             return
         
         # Procesar texto como si fuera voz transcrito
@@ -2034,7 +2041,7 @@ class TelegramBotHandler:
                 del self.user_states[user.id]
     
     async def _add_ampliacion_to_task(self, update, task_id: int, ampliacion_text: str, user):
-        """Añade ampliación a una tarea"""
+        """Añade ampliación a una tarea (guarda en historial)"""
         reply_markup = self._get_reply_keyboard()
         
         try:
@@ -2046,18 +2053,20 @@ class TelegramBotHandler:
                 )
                 return
             
-            # Obtener ampliación existente si hay
-            ampliacion_existente = task.get('ampliacion', '') or ''
-            
-            # Si ya hay ampliación, añadir nueva línea y concatenar
-            if ampliacion_existente:
-                nueva_ampliacion = ampliacion_existente + "\n\n" + ampliacion_text
-            else:
-                nueva_ampliacion = ampliacion_text
-            
-            # Actualizar ampliación con nombre del usuario
+            # Guardar en historial con fecha y hora
             user_name = user.full_name if hasattr(user, 'full_name') else (user.username if hasattr(user, 'username') else f'Usuario {user.id}')
-            self.db.update_task(task_id, ampliacion=nueva_ampliacion, ampliacion_user=user_name)
+            from datetime import datetime
+            self.db.add_ampliacion_history(task_id, ampliacion_text, user_name, user.id)
+            
+            # Obtener todas las ampliaciones del historial para actualizar el campo ampliacion
+            history = self.db.get_task_ampliaciones_history(task_id)
+            ampliacion_completa = "\n\n---\n\n".join([
+                f"[{datetime.fromisoformat(h['created_at'].replace('Z', '+00:00')).strftime('%d/%m/%Y %H:%M')}] {h['user_name']}:\n{h['ampliacion_text']}"
+                for h in history
+            ])
+            
+            # Actualizar campo ampliacion con todo el historial formateado
+            self.db.update_task(task_id, ampliacion=ampliacion_completa, ampliacion_user=user_name)
             
             await update.message.reply_text(
                 f"✅ Ampliación añadida a la tarea:\n\n"
@@ -2068,6 +2077,155 @@ class TelegramBotHandler:
         except Exception as e:
             await update.message.reply_text(
                 f"❌ Error al añadir ampliación: {str(e)}",
+                reply_markup=reply_markup
+            )
+    
+    async def _handle_users_command(self, update, user):
+        """Gestiona usuarios del panel web desde Telegram (solo master)"""
+        reply_markup = self._get_reply_keyboard()
+        
+        try:
+            # Verificar que el usuario es master
+            master_user = self.db.get_web_user_by_username('master')
+            if not master_user or not master_user.get('is_master'):
+                await update.message.reply_text(
+                    "❌ Solo el usuario maestro puede gestionar usuarios.",
+                    reply_markup=reply_markup
+                )
+                return
+            
+            text = update.message.text.strip()
+            parts = text.split(' ', 1)
+            command = parts[0].lower()
+            
+            if len(parts) == 1:
+                # Mostrar lista de usuarios
+                users = self.db.get_all_web_users()
+                if not users:
+                    await update.message.reply_text(
+                        "📋 No hay usuarios registrados.",
+                        reply_markup=reply_markup
+                    )
+                    return
+                
+                message = "👥 **Usuarios del panel web:**\n\n"
+                for u in users:
+                    status = "✅" if u.get('is_active') else "❌"
+                    master_badge = "👑" if u.get('is_master') else ""
+                    categories = self.db.get_user_categories(u['id'])
+                    cats_str = ", ".join(categories) if categories else "Sin categorías"
+                    message += f"{status} {master_badge} **{u['username']}** ({u['full_name']})\n"
+                    message += f"   Categorías: {cats_str}\n\n"
+                
+                message += "\n📝 **Comandos disponibles:**\n"
+                message += "• `/usuarios crear usuario contraseña nombre` - Crear usuario\n"
+                message += "• `/usuarios listar` - Listar usuarios\n"
+                message += "• `/usuarios categorias usuario categoria1,categoria2` - Asignar categorías\n"
+                
+                await update.message.reply_text(message, reply_markup=reply_markup, parse_mode='Markdown')
+                return
+            
+            args = parts[1].strip()
+            args_parts = args.split(' ', 2)
+            
+            if args_parts[0].lower() == 'crear' and len(args_parts) >= 3:
+                # Crear usuario: /usuarios crear username password "Full Name"
+                username = args_parts[1]
+                password = args_parts[2] if len(args_parts) > 2 else None
+                full_name = args_parts[3] if len(args_parts) > 3 else username
+                
+                if not password:
+                    await update.message.reply_text(
+                        "❌ Formato incorrecto. Usa: `/usuarios crear username password \"Nombre Completo\"`",
+                        reply_markup=reply_markup,
+                        parse_mode='Markdown'
+                    )
+                    return
+                
+                # Verificar que el usuario no existe
+                if self.db.get_web_user_by_username(username):
+                    await update.message.reply_text(
+                        f"❌ El usuario '{username}' ya existe.",
+                        reply_markup=reply_markup
+                    )
+                    return
+                
+                # Crear usuario
+                from werkzeug.security import generate_password_hash
+                password_hash = generate_password_hash(password)
+                user_id = self.db.create_web_user(username, password_hash, full_name, is_master=False)
+                
+                await update.message.reply_text(
+                    f"✅ Usuario creado:\n\n"
+                    f"👤 Usuario: {username}\n"
+                    f"📝 Nombre: {full_name}\n"
+                    f"🔑 Contraseña: {password}\n\n"
+                    f"💡 Usa `/usuarios categorias {username} categoria1,categoria2` para asignar categorías.",
+                    reply_markup=reply_markup
+                )
+                return
+            
+            elif args_parts[0].lower() == 'categorias' and len(args_parts) >= 3:
+                # Asignar categorías: /usuarios categorias username categoria1,categoria2
+                username = args_parts[1]
+                categories_str = args_parts[2]
+                
+                user_to_update = self.db.get_web_user_by_username(username)
+                if not user_to_update:
+                    await update.message.reply_text(
+                        f"❌ Usuario '{username}' no encontrado.",
+                        reply_markup=reply_markup
+                    )
+                    return
+                
+                if user_to_update.get('is_master'):
+                    await update.message.reply_text(
+                        "❌ No se pueden modificar las categorías del usuario maestro.",
+                        reply_markup=reply_markup
+                    )
+                    return
+                
+                category_names = [c.strip() for c in categories_str.split(',') if c.strip()]
+                
+                # Verificar que las categorías existen
+                all_categories = self.db.get_all_categories()
+                valid_categories = [cat['name'] for cat in all_categories]
+                invalid_categories = [c for c in category_names if c not in valid_categories]
+                
+                if invalid_categories:
+                    await update.message.reply_text(
+                        f"❌ Categorías inválidas: {', '.join(invalid_categories)}\n\n"
+                        f"Categorías disponibles: {', '.join(valid_categories)}",
+                        reply_markup=reply_markup
+                    )
+                    return
+                
+                # Asignar categorías
+                self.db.set_user_categories(user_to_update['id'], category_names)
+                
+                await update.message.reply_text(
+                    f"✅ Categorías asignadas a '{username}':\n"
+                    f"{', '.join(category_names)}",
+                    reply_markup=reply_markup
+                )
+                return
+            
+            else:
+                await update.message.reply_text(
+                    "❌ Comando no reconocido.\n\n"
+                    "📝 **Comandos disponibles:**\n"
+                    "• `/usuarios` - Listar usuarios\n"
+                    "• `/usuarios crear username password \"Nombre\"` - Crear usuario\n"
+                    "• `/usuarios categorias username cat1,cat2` - Asignar categorías",
+                    reply_markup=reply_markup,
+                    parse_mode='Markdown'
+                )
+                return
+                
+        except Exception as e:
+            logger.error(f"Error en gestión de usuarios: {e}", exc_info=True)
+            await update.message.reply_text(
+                f"❌ Error: {str(e)}",
                 reply_markup=reply_markup
             )
     

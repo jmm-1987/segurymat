@@ -442,9 +442,17 @@ def tasks():
     
     db = database.db
     tasks_list = db.get_tasks()
-    categories_list = db.get_all_categories()  # Obtener categorías de la BD
     
-    # Filtrar por categorías permitidas si no es maestro
+    # Obtener categorías según permisos del usuario
+    if current_user.get('is_master'):
+        categories_list = db.get_all_categories()  # Master ve todas las categorías
+    else:
+        # Usuarios normales solo ven sus categorías asignadas
+        allowed_category_names = db.get_user_categories(current_user['id'])
+        all_categories = db.get_all_categories()
+        categories_list = [cat for cat in all_categories if cat.get('name') in allowed_category_names]
+    
+    # Filtrar tareas por categorías permitidas si no es maestro
     if not current_user.get('is_master'):
         allowed_categories = db.get_user_categories(current_user['id'])
         tasks_list = [t for t in tasks_list if not t.get('category') or t.get('category') in allowed_categories]
@@ -973,6 +981,17 @@ def complete_task(task_id):
     current_user = get_current_user()
     db = database.db
     
+    # Verificar que la tarea existe
+    task = db.get_task_by_id(task_id)
+    if not task:
+        return redirect(url_for('tasks'))
+    
+    # Verificar acceso a la categoría si no es master
+    if not current_user.get('is_master'):
+        task_category = task.get('category')
+        if task_category and not db.user_has_category_access(current_user['id'], task_category):
+            return redirect(url_for('tasks'))
+    
     if current_user.get('is_master'):
         # El maestro puede completar directamente
         db.complete_task(task_id)
@@ -995,7 +1014,7 @@ def delete_task(task_id):
 @app.route('/admin/tasks/<int:task_id>/ampliar', methods=['POST'])
 @login_required
 def ampliar_task(task_id):
-    """Añade una ampliación a una tarea (concatena con las existentes)"""
+    """Añade una ampliación a una tarea (guarda en historial)"""
     try:
         data = request.get_json()
         ampliacion_text = data.get('ampliacion', '').strip()
@@ -1011,22 +1030,58 @@ def ampliar_task(task_id):
         if not task:
             return jsonify({'error': 'Tarea no encontrada'}), 404
         
-        # Obtener ampliación existente si hay
-        ampliacion_existente = task.get('ampliacion', '') or ''
+        # Verificar acceso a la categoría si no es master
+        if not current_user.get('is_master'):
+            task_category = task.get('category')
+            if task_category and not db.user_has_category_access(current_user['id'], task_category):
+                return jsonify({'error': 'No tienes acceso a esta categoría'}), 403
         
-        # Si ya hay ampliación, añadir nueva línea y concatenar
-        if ampliacion_existente:
-            nueva_ampliacion = ampliacion_existente + "\n\n" + ampliacion_text
-        else:
-            nueva_ampliacion = ampliacion_text
-        
-        # Actualizar ampliación con nombre del usuario
+        # Guardar en historial con fecha y hora
         user_name = current_user.get('full_name') or current_user.get('username', 'Usuario Web')
-        db.update_task(task_id, ampliacion=nueva_ampliacion, ampliacion_user=user_name)
+        from datetime import datetime
+        timestamp = datetime.now().strftime('%d/%m/%Y %H:%M')
+        ampliacion_con_timestamp = f"[{timestamp}] {user_name}:\n{ampliacion_text}"
+        
+        db.add_ampliacion_history(task_id, ampliacion_text, user_name, current_user['id'])
+        
+        # Obtener todas las ampliaciones del historial para actualizar el campo ampliacion
+        history = db.get_task_ampliaciones_history(task_id)
+        ampliacion_completa = "\n\n---\n\n".join([
+            f"[{datetime.fromisoformat(h['created_at'].replace('Z', '+00:00')).strftime('%d/%m/%Y %H:%M')}] {h['user_name']}:\n{h['ampliacion_text']}"
+            for h in history
+        ])
+        
+        # Actualizar campo ampliacion con todo el historial formateado
+        db.update_task(task_id, ampliacion=ampliacion_completa, ampliacion_user=user_name)
         
         return jsonify({'success': True})
     except Exception as e:
         logger.error(f"Error al ampliar tarea: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+@app.route('/admin/tasks/<int:task_id>/ampliaciones-history')
+@login_required
+def get_task_ampliaciones_history(task_id):
+    """Obtiene el historial de ampliaciones de una tarea"""
+    try:
+        db = database.db
+        current_user = get_current_user()
+        
+        # Verificar que la tarea existe
+        task = db.get_task_by_id(task_id)
+        if not task:
+            return jsonify({'error': 'Tarea no encontrada'}), 404
+        
+        # Verificar acceso a la categoría si no es master
+        if not current_user.get('is_master'):
+            task_category = task.get('category')
+            if task_category and not db.user_has_category_access(current_user['id'], task_category):
+                return jsonify({'error': 'No tienes acceso a esta categoría'}), 403
+        
+        history = db.get_task_ampliaciones_history(task_id)
+        return jsonify({'success': True, 'history': history})
+    except Exception as e:
+        logger.error(f"Error al obtener historial de ampliaciones: {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 
