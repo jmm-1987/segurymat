@@ -538,11 +538,31 @@ def tasks():
     # Ordenar tareas con fecha por fecha más reciente primero (descendente)
     tasks_with_date.sort(key=lambda x: x.get('task_date', '') or '', reverse=True)
     
-    # Obtener imágenes para cada tarea
+    # Obtener imágenes y última ampliación para cada tarea
     for task in tasks_with_date:
         task['images'] = db.get_task_images(task['id'])
+        # Obtener última ampliación del historial
+        last_ampliacion = db.get_last_ampliacion(task['id'])
+        if last_ampliacion:
+            task['last_ampliacion'] = {
+                'text': last_ampliacion.get('ampliacion_text', ''),
+                'user_name': last_ampliacion.get('user_name', ''),
+                'created_at': last_ampliacion.get('created_at', '')
+            }
+        else:
+            task['last_ampliacion'] = None
     for task in tasks_without_date:
         task['images'] = db.get_task_images(task['id'])
+        # Obtener última ampliación del historial
+        last_ampliacion = db.get_last_ampliacion(task['id'])
+        if last_ampliacion:
+            task['last_ampliacion'] = {
+                'text': last_ampliacion.get('ampliacion_text', ''),
+                'user_name': last_ampliacion.get('user_name', ''),
+                'created_at': last_ampliacion.get('created_at', '')
+            }
+        else:
+            task['last_ampliacion'] = None
     
     # Para vista de calendario, calcular la semana y organizar tareas por día
     tasks_by_weekday = {}
@@ -611,7 +631,8 @@ def tasks():
         current_task_date=task_date,
         current_search=search_query_raw,
         view_mode=view_mode,
-        categories=categories_list
+        categories=categories_list,
+        current_user=current_user
     )
 
 
@@ -695,20 +716,8 @@ def categories():
 @app.route('/admin/categories/<int:category_id>/update', methods=['POST'])
 @login_required
 def update_category(category_id):
-    """Actualiza una categoría"""
-    try:
-        data = request.get_json()
-        icon = data.get('icon')
-        color = data.get('color')
-        display_name = data.get('display_name')
-        
-        success = database.db.update_category(category_id, icon=icon, color=color, display_name=display_name)
-        if success:
-            return jsonify({'success': True})
-        else:
-            return jsonify({'error': 'Categoría no encontrada'}), 404
-    except Exception as e:
-        return jsonify({'error': str(e)}), 500
+    """Actualiza una categoría - BLOQUEADO: Las categorías no se pueden editar"""
+    return jsonify({'error': 'Las categorías están bloqueadas y no se pueden editar'}), 403
 
 
 @app.route('/admin/database')
@@ -739,9 +748,9 @@ def create_user():
         if db.get_web_user_by_username(username):
             return jsonify({'error': 'El usuario ya existe'}), 400
         
-        # Crear usuario
+        # Crear usuario (siempre activo por defecto)
         password_hash = generate_password_hash(password)
-        user_id = db.create_web_user(username, password_hash, full_name, is_master=False)
+        user_id = db.create_web_user(username, password_hash, full_name, is_master=False, is_active=True)
         
         # Asignar categorías
         if category_names:

@@ -572,14 +572,14 @@ class Database:
     
     # ========== USUARIOS WEB ==========
     
-    def create_web_user(self, username: str, password_hash: str, full_name: str, is_master: bool = False) -> int:
-        """Crea un nuevo usuario web"""
+    def create_web_user(self, username: str, password_hash: str, full_name: str, is_master: bool = False, is_active: bool = True) -> int:
+        """Crea un nuevo usuario web (siempre activo por defecto)"""
         conn = self.get_connection()
         cursor = conn.cursor()
         cursor.execute('''
-            INSERT INTO web_users (username, password_hash, full_name, is_master)
-            VALUES (?, ?, ?, ?)
-        ''', (username, password_hash, full_name, 1 if is_master else 0))
+            INSERT INTO web_users (username, password_hash, full_name, is_master, is_active)
+            VALUES (?, ?, ?, ?, ?)
+        ''', (username, password_hash, full_name, 1 if is_master else 0, 1 if is_active else 0))
         user_id = cursor.lastrowid
         conn.commit()
         conn.close()
@@ -727,6 +727,21 @@ class Database:
         rows = cursor.fetchall()
         conn.close()
         return [dict(row) for row in rows]
+    
+    def get_last_ampliacion(self, task_id: int) -> Optional[Dict]:
+        """Obtiene la última ampliación de una tarea"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT id, ampliacion_text, user_name, user_id, created_at
+            FROM task_ampliaciones_history
+            WHERE task_id = ?
+            ORDER BY created_at DESC
+            LIMIT 1
+        ''', (task_id,))
+        row = cursor.fetchone()
+        conn.close()
+        return dict(row) if row else None
 
 
 # Instancia global
