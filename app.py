@@ -674,16 +674,18 @@ def categories():
     db = database.db
     categories_list = db.get_all_categories()
     
-    # Si es maestro, obtener usuarios para gestión
+    # Si es maestro, obtener usuarios para gestión (excluyendo el master)
     users_with_categories = []
     if get_current_user() and get_current_user().get('is_master'):
         users_list = db.get_all_web_users()
         for user in users_list:
-            user_categories = db.get_user_categories(user['id'])
-            users_with_categories.append({
-                **user,
-                'categories': user_categories
-            })
+            # Excluir usuarios master de la lista
+            if not user.get('is_master'):
+                user_categories = db.get_user_categories(user['id'])
+                users_with_categories.append({
+                    **user,
+                    'categories': user_categories
+                })
     
     return render_template('categories.html', 
                           categories=categories_list,
@@ -716,29 +718,9 @@ def database_management():
     return render_template('database.html')
 
 
-# ========== GESTIÓN DE USUARIOS ==========
+# ========== GESTIÓN DE USUARIOS (dentro de categorías) ==========
 
-@app.route('/admin/users')
-@master_required
-def users():
-    """Vista de gestión de usuarios"""
-    db = database.db
-    users_list = db.get_all_web_users()
-    categories_list = db.get_all_categories()
-    
-    # Obtener categorías de cada usuario
-    users_with_categories = []
-    for user in users_list:
-        user_categories = db.get_user_categories(user['id'])
-        users_with_categories.append({
-            **user,
-            'categories': user_categories
-        })
-    
-    return render_template('users.html', users=users_with_categories, categories=categories_list)
-
-
-@app.route('/admin/users/create', methods=['POST'])
+@app.route('/admin/categories/users/create', methods=['POST'])
 @master_required
 def create_user():
     """Crear nuevo usuario"""
@@ -767,10 +749,11 @@ def create_user():
         
         return jsonify({'success': True, 'user_id': user_id})
     except Exception as e:
+        logger.error(f"Error al crear usuario: {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/admin/users/<int:user_id>')
+@app.route('/admin/categories/users/<int:user_id>')
 @master_required
 def get_user(user_id):
     """Obtiene los datos de un usuario para editar"""
@@ -790,7 +773,7 @@ def get_user(user_id):
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/admin/users/<int:user_id>/update', methods=['POST'])
+@app.route('/admin/categories/users/<int:user_id>/update', methods=['POST'])
 @master_required
 def update_user(user_id):
     """Actualizar usuario"""
@@ -839,7 +822,7 @@ def update_user(user_id):
         return jsonify({'error': str(e)}), 500
 
 
-@app.route('/admin/users/<int:user_id>/delete', methods=['POST'])
+@app.route('/admin/categories/users/<int:user_id>/delete', methods=['POST'])
 @master_required
 def delete_user(user_id):
     """Eliminar usuario"""
@@ -857,6 +840,7 @@ def delete_user(user_id):
         db.delete_web_user(user_id)
         return jsonify({'success': True})
     except Exception as e:
+        logger.error(f"Error al eliminar usuario: {e}", exc_info=True)
         return jsonify({'error': str(e)}), 500
 
 

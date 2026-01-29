@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Editar Categorías - Panel de Control</title>
+    <title>Configuración: Categorías y Usuarios - Panel de Control</title>
     <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
     <style>
         .categories-container {
@@ -169,25 +169,106 @@
             margin-bottom: 1rem;
             display: none;
         }
+        
+        .user-card {
+            transition: transform 0.2s ease;
+        }
+        
+        .user-card:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.12);
+        }
+        
+        /* Modal styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(5px);
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .modal-content {
+            background: white;
+            padding: 2rem;
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0, 0, 0, 0.3);
+            max-height: 90vh;
+            overflow-y: auto;
+            position: relative;
+        }
+        
+        .close {
+            color: #aaa;
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+            position: absolute;
+            right: 1rem;
+            top: 1rem;
+        }
+        
+        .close:hover,
+        .close:focus {
+            color: #000;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .form-group input[type="text"],
+        .form-group input[type="password"] {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1.5px solid #e0e0e0;
+            border-radius: 6px;
+            font-size: 0.9rem;
+        }
+        
+        .form-group input[type="text"]:focus,
+        .form-group input[type="password"]:focus {
+            outline: none;
+            border-color: #3498db;
+        }
+        
+        .form-group small {
+            display: block;
+            margin-top: 0.25rem;
+            font-size: 0.8rem;
+        }
     </style>
 </head>
 <body>
     
     <div class="categories-container">
         <div class="categories-header">
-            <h1>⚙️ Editar Categorías</h1>
+            <h1>⚙️ Configuración: Categorías y Usuarios</h1>
             <a href="{{ url_for('tasks') }}" class="back-button">← Volver a Tareas</a>
         </div>
         
         <div id="successMessage" class="success-message">
-            ✅ Categoría actualizada correctamente
+            ✅ Operación realizada correctamente
         </div>
         
         <div id="errorMessage" class="error-message">
-            ❌ Error al actualizar la categoría
+            ❌ Error en la operación
         </div>
         
-        {% for category in categories %}
+        <!-- Sección de Categorías -->
+        <div style="margin-bottom: 3rem;">
+            <h2 style="color: white; margin-bottom: 1.5rem; font-size: 1.5rem;">📂 Categorías</h2>
+            {% for category in categories %}
         <div class="category-card" data-category-id="{{ category.id }}">
             <div class="category-header">
                 <div class="category-icon-preview" id="iconPreview{{ category.id }}" style="background: {{ category.color }};">
@@ -233,6 +314,126 @@
             </form>
         </div>
         {% endfor %}
+        </div>
+        
+        <!-- Sección de Usuarios -->
+        <div style="margin-top: 3rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1.5rem;">
+                <h2 style="color: white; margin: 0; font-size: 1.5rem;">👥 Usuarios del Panel Web</h2>
+                <button onclick="openCreateUserModal()" class="btn btn-primary" style="padding: 0.6rem 1.2rem; font-size: 0.9rem;">
+                    ➕ Crear Usuario
+                </button>
+            </div>
+            
+            {% if users %}
+            <div id="usersList">
+                {% for user in users %}
+                <div class="category-card user-card" data-user-id="{{ user.id }}" style="margin-bottom: 1rem;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.75rem;">
+                        <div>
+                            <strong style="font-size: 1.1rem; color: #333;">{{ user.full_name }}</strong>
+                            <span style="color: #666; margin-left: 0.5rem;">(@{{ user.username }})</span>
+                            {% if user.is_master %}
+                            <span style="background: #FFD700; color: #333; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; margin-left: 0.5rem;">👑 Master</span>
+                            {% endif %}
+                            {% if not user.is_active %}
+                            <span style="background: #e74c3c; color: white; padding: 0.2rem 0.5rem; border-radius: 4px; font-size: 0.75rem; margin-left: 0.5rem;">❌ Inactivo</span>
+                            {% endif %}
+                        </div>
+                        {% if not user.is_master %}
+                        <div style="display: flex; gap: 0.5rem;">
+                            <button onclick="openEditUserModal({{ user.id }})" class="btn btn-secondary" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">
+                                ✏️ Editar
+                            </button>
+                            <button onclick="deleteUser({{ user.id }})" class="btn btn-danger" style="padding: 0.4rem 0.8rem; font-size: 0.85rem;">
+                                🗑️ Eliminar
+                            </button>
+                        </div>
+                        {% endif %}
+                    </div>
+                    
+                    <div style="margin-top: 0.75rem;">
+                        <strong style="color: #555; font-size: 0.9rem;">Categorías asignadas:</strong>
+                        <div style="display: flex; flex-wrap: wrap; gap: 0.5rem; margin-top: 0.5rem;">
+                            {% if user.categories %}
+                                {% for cat_name in user.categories %}
+                                    {% set cat = categories|selectattr('name', 'equalto', cat_name)|first %}
+                                    {% if cat %}
+                                    <span style="background: {{ cat.color }}; color: white; padding: 0.3rem 0.6rem; border-radius: 6px; font-size: 0.8rem;">
+                                        {{ cat.icon }} {{ cat.display_name or cat.name }}
+                                    </span>
+                                    {% else %}
+                                    <span style="background: #95a5a6; color: white; padding: 0.3rem 0.6rem; border-radius: 6px; font-size: 0.8rem;">
+                                        {{ cat_name }}
+                                    </span>
+                                    {% endif %}
+                                {% endfor %}
+                            {% else %}
+                                <span style="color: #999; font-style: italic;">Sin categorías asignadas</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% else %}
+            <div class="category-card" style="text-align: center; padding: 2rem; color: #999;">
+                <p>No hay usuarios registrados (excepto el master)</p>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+    
+    <!-- Modal para crear/editar usuario -->
+    <div id="userModal" class="modal" style="display: none;">
+        <div class="modal-content" style="max-width: 600px;">
+            <span class="close" onclick="closeUserModal()">&times;</span>
+            <h3 id="userModalTitle" style="margin-top: 0;">➕ Crear Usuario</h3>
+            
+            <form id="userForm" onsubmit="saveUser(event)">
+                <input type="hidden" id="userId" name="user_id">
+                
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label for="username">Usuario:</label>
+                    <input type="text" id="username" name="username" required style="width: 100%; padding: 0.75rem; border: 1.5px solid #e0e0e0; border-radius: 6px;">
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label for="fullName">Nombre Completo:</label>
+                    <input type="text" id="fullName" name="full_name" required style="width: 100%; padding: 0.75rem; border: 1.5px solid #e0e0e0; border-radius: 6px;">
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label for="password">Contraseña:</label>
+                    <input type="password" id="password" name="password" style="width: 100%; padding: 0.75rem; border: 1.5px solid #e0e0e0; border-radius: 6px;">
+                    <small style="color: #666;">(Dejar vacío para mantener la contraseña actual al editar)</small>
+                </div>
+                
+                <div class="form-group" style="margin-bottom: 1rem;">
+                    <label>Categorías:</label>
+                    <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem; max-height: 200px; overflow-y: auto; padding: 0.5rem; border: 1.5px solid #e0e0e0; border-radius: 6px;">
+                        {% for category in categories %}
+                        <label style="display: flex; align-items: center; gap: 0.5rem; cursor: pointer; padding: 0.3rem;">
+                            <input type="checkbox" name="categories" value="{{ category.name }}" class="category-checkbox">
+                            <span style="font-size: 0.9rem;">{{ category.icon }} {{ category.display_name or category.name }}</span>
+                        </label>
+                        {% endfor %}
+                    </div>
+                </div>
+                
+                <div id="editUserActive" class="form-group" style="margin-bottom: 1rem; display: none;">
+                    <label style="display: flex; align-items: center; gap: 0.5rem;">
+                        <input type="checkbox" id="isActive" name="is_active">
+                        <span>Usuario activo</span>
+                    </label>
+                </div>
+                
+                <div style="display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1.5rem;">
+                    <button type="button" class="btn btn-secondary" onclick="closeUserModal()">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">💾 Guardar</button>
+                </div>
+            </form>
+        </div>
     </div>
     
     <script>
@@ -300,6 +501,188 @@
             } finally {
                 saveButton.disabled = false;
                 saveButton.textContent = '💾 Guardar Cambios';
+            }
+        }
+        
+        // Funciones para gestión de usuarios
+        function openCreateUserModal() {
+            document.getElementById('userModalTitle').textContent = '➕ Crear Usuario';
+            document.getElementById('userId').value = '';
+            document.getElementById('userForm').reset();
+            document.getElementById('editUserActive').style.display = 'none';
+            document.getElementById('userModal').style.display = 'flex';
+        }
+        
+        async function openEditUserModal(userId) {
+            document.getElementById('userModalTitle').textContent = '✏️ Editar Usuario';
+            document.getElementById('editUserActive').style.display = 'block';
+            
+            try {
+                const response = await fetch(`/admin/categories/users/${userId}`);
+                const user = await response.json();
+                
+                if (response.ok && user) {
+                    document.getElementById('userId').value = user.id;
+                    document.getElementById('username').value = user.username || '';
+                    document.getElementById('fullName').value = user.full_name || '';
+                    document.getElementById('password').value = '';
+                    document.getElementById('isActive').checked = user.is_active || false;
+                    
+                    // Marcar categorías del usuario
+                    document.querySelectorAll('.category-checkbox').forEach(checkbox => {
+                        checkbox.checked = user.categories && user.categories.includes(checkbox.value);
+                    });
+                    
+                    document.getElementById('userModal').style.display = 'flex';
+                } else {
+                    throw new Error(user.error || 'Error al cargar usuario');
+                }
+            } catch (error) {
+                alert('Error al cargar usuario: ' + error.message);
+            }
+        }
+        
+        function closeUserModal() {
+            document.getElementById('userModal').style.display = 'none';
+            document.getElementById('userForm').reset();
+        }
+        
+        async function saveUser(event) {
+            event.preventDefault();
+            
+            const form = event.target;
+            const formData = new FormData(form);
+            const userId = formData.get('user_id');
+            const password = formData.get('password');
+            
+            // Si es edición y no hay contraseña, no incluirla
+            const data = {
+                username: formData.get('username'),
+                full_name: formData.get('full_name'),
+                categories: Array.from(formData.getAll('categories'))
+            };
+            
+            if (password) {
+                data.password = password;
+            }
+            
+            if (userId) {
+                // Editar usuario
+                if (formData.get('is_active') !== null) {
+                    data.is_active = document.getElementById('isActive').checked;
+                }
+                
+                try {
+                    const formDataToSend = new FormData();
+                    Object.keys(data).forEach(key => {
+                        if (key === 'categories') {
+                            data[key].forEach(cat => formDataToSend.append('categories', cat));
+                        } else {
+                            formDataToSend.append(key, data[key]);
+                        }
+                    });
+                    
+                    const response = await fetch(`/admin/categories/users/${userId}/update`, {
+                        method: 'POST',
+                        body: formDataToSend
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (response.ok && result.success) {
+                        document.getElementById('successMessage').textContent = '✅ Usuario actualizado correctamente';
+                        document.getElementById('successMessage').style.display = 'block';
+                        setTimeout(() => {
+                            document.getElementById('successMessage').style.display = 'none';
+                            window.location.reload();
+                        }, 1500);
+                    } else {
+                        throw new Error(result.error || 'Error al actualizar usuario');
+                    }
+                } catch (error) {
+                    document.getElementById('errorMessage').textContent = '❌ ' + error.message;
+                    document.getElementById('errorMessage').style.display = 'block';
+                    setTimeout(() => {
+                        document.getElementById('errorMessage').style.display = 'none';
+                    }, 5000);
+                }
+            } else {
+                // Crear usuario
+                if (!data.password) {
+                    alert('La contraseña es requerida para crear un usuario');
+                    return;
+                }
+                
+                try {
+                    const formDataToSend = new FormData();
+                    formDataToSend.append('username', data.username);
+                    formDataToSend.append('full_name', data.full_name);
+                    formDataToSend.append('password', data.password);
+                    data.categories.forEach(cat => formDataToSend.append('categories', cat));
+                    
+                    const response = await fetch('/admin/categories/users/create', {
+                        method: 'POST',
+                        body: formDataToSend
+                    });
+                    
+                    const result = await response.json();
+                    
+                    if (response.ok && result.success) {
+                        document.getElementById('successMessage').textContent = '✅ Usuario creado correctamente';
+                        document.getElementById('successMessage').style.display = 'block';
+                        setTimeout(() => {
+                            document.getElementById('successMessage').style.display = 'none';
+                            window.location.reload();
+                        }, 1500);
+                    } else {
+                        throw new Error(result.error || 'Error al crear usuario');
+                    }
+                } catch (error) {
+                    document.getElementById('errorMessage').textContent = '❌ ' + error.message;
+                    document.getElementById('errorMessage').style.display = 'block';
+                    setTimeout(() => {
+                        document.getElementById('errorMessage').style.display = 'none';
+                    }, 5000);
+                }
+            }
+        }
+        
+        async function deleteUser(userId) {
+            if (!confirm('¿Estás seguro de que quieres eliminar este usuario?')) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`/admin/categories/users/${userId}/delete`, {
+                    method: 'POST'
+                });
+                
+                const result = await response.json();
+                
+                if (response.ok && result.success) {
+                    document.getElementById('successMessage').textContent = '✅ Usuario eliminado correctamente';
+                    document.getElementById('successMessage').style.display = 'block';
+                    setTimeout(() => {
+                        document.getElementById('successMessage').style.display = 'none';
+                        window.location.reload();
+                    }, 1500);
+                } else {
+                    throw new Error(result.error || 'Error al eliminar usuario');
+                }
+            } catch (error) {
+                document.getElementById('errorMessage').textContent = '❌ ' + error.message;
+                document.getElementById('errorMessage').style.display = 'block';
+                setTimeout(() => {
+                    document.getElementById('errorMessage').style.display = 'none';
+                }, 5000);
+            }
+        }
+        
+        // Cerrar modal al hacer clic fuera
+        window.onclick = function(event) {
+            const userModal = document.getElementById('userModal');
+            if (event.target == userModal) {
+                closeUserModal();
             }
         }
     </script>

@@ -82,16 +82,16 @@ class TelegramBotHandler:
                 "  - 'Listar tareas pendientes'\n"
                 "  - 'Da por hecha la tarea del cliente Alditraex'\n\n"
                 "💬 Puedes escribir o enviar un audio con tu comando.\n\n"
-                "👥 **Gestión de usuarios (solo master):**\n"
-                "• /usuarios - Gestionar usuarios del panel web",
+                "🌐 **Panel Web:**\n"
+                "• Accede al panel web para gestionar usuarios y categorías",
                 reply_markup=reply_markup
             )
             return
         
-        # Comando de gestión de usuarios (solo para master)
-        if text_lower in ['/usuarios', '/users', 'usuarios', 'users']:
-            await self._handle_users_command(update, user)
-            return
+        # Comando de gestión de usuarios deshabilitado - ahora se gestiona desde el panel web
+        # if text_lower in ['/usuarios', '/users', 'usuarios', 'users']:
+        #     await self._handle_users_command(update, user)
+        #     return
         
         # Procesar texto como si fuera voz transcrito
         user = update.effective_user
@@ -407,12 +407,13 @@ class TelegramBotHandler:
     
     async def _handle_create_task(self, update: Update, context: ContextTypes.DEFAULT_TYPE,
                                  parsed: dict, user):
-        """Maneja creación de tarea - primero pregunta por categoría"""
+        """Maneja creación de tarea - usa categoría de OpenAI si está disponible"""
         entities = parsed['entities']
         title = entities.get('title', parsed['original_text'])
         priority = entities.get('priority', 'normal')
         task_date = entities.get('date')
         client_info = entities.get('client')
+        category = entities.get('category')  # Categoría detectada por OpenAI
         
         # Verificar si hay una imagen pendiente de adjuntar
         user_state = self.user_states.get(user.id)
@@ -441,6 +442,74 @@ class TelegramBotHandler:
                 # Ofrecer crear cliente nuevo
                 await self._offer_create_client(update, context, client_name_raw, parsed, user)
                 return
+        
+        # Verificar si la categoría detectada es válida
+        if category:
+            # Validar que la categoría existe en la base de datos
+            categories = self.db.get_all_categories()
+            category_names = [cat['name'] for cat in categories]
+            
+            if category in category_names:
+                # Categoría válida, crear tarea directamente
+                logger.info(f"[TASK] Categoría detectada por OpenAI: {category}")
+                try:
+                    task_id = self.db.create_task(
+                        user_id=user.id,
+                        user_name=user.full_name if hasattr(user, 'full_name') else (user.username if hasattr(user, 'username') else f'Usuario {user.id}'),
+                        title=title,
+                        description=parsed.get('original_text', ''),
+                        priority=priority,
+                        task_date=task_date,
+                        client_id=client_id,
+                        client_name_raw=client_name_raw,
+                        category=category
+                    )
+                    
+                    # Si hay una imagen pendiente, adjuntarla automáticamente
+                    if photo_file_id:
+                        await self._assign_image_to_task_from_callback(
+                            None, update, context, task_id, 
+                            {'file_id': photo_file_id, 'file_unique_id': photo_file_unique_id}, 
+                            user
+                        )
+                    
+                    # Limpiar estado
+                    if user.id in self.user_states:
+                        del self.user_states[user.id]
+                    
+                    # Confirmar creación
+                    categories = self.db.get_all_categories()
+                    category_obj = next((c for c in categories if c['name'] == category), None)
+                    category_display = category_obj['display_name'] if category_obj else category
+                    
+                    reply_markup = self._get_reply_keyboard()
+                    message = f"✅ Tarea creada:\n\n"
+                    message += f"📝 {title}\n"
+                    if category_obj:
+                        message += f"📂 {category_obj['icon']} {category_display}\n"
+                    if task_date:
+                        from datetime import datetime
+                        try:
+                            if isinstance(task_date, datetime):
+                                date_str = task_date.strftime('%d/%m/%Y')
+                            else:
+                                date_str = datetime.fromisoformat(str(task_date).replace('Z', '+00:00')).strftime('%d/%m/%Y')
+                            message += f"📅 {date_str}\n"
+                        except:
+                            pass
+                    if priority == 'urgent':
+                        message += f"🔴 Urgente\n"
+                    if client_name_raw:
+                        message += f"👤 Cliente: {client_name_raw}\n"
+                    
+                    await update.message.reply_text(message, reply_markup=reply_markup)
+                    return
+                except Exception as e:
+                    logger.error(f"[TASK] Error al crear tarea con categoría detectada: {e}", exc_info=True)
+                    # Si falla, continuar para preguntar por categoría
+        
+        # Si no hay categoría o no es válida, preguntar por categoría
+        logger.info(f"[TASK] No se detectó categoría válida, preguntando al usuario")
         
         # Guardar estado y preguntar por categoría
         self.user_states[user.id] = {

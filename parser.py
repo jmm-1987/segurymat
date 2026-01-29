@@ -429,35 +429,43 @@ class IntentParser:
         system_prompt = f"""Eres un asistente experto en extraer información estructurada de mensajes sobre tareas en español.
 
 TU TAREA es analizar el texto y extraer SIEMPRE estos campos:
-1. CATEGORÍA: Debe ser EXACTAMENTE una de las categorías disponibles (usa el nombre exacto)
+1. CATEGORÍA: DEBE ser EXACTAMENTE una de las categorías disponibles (usa el nombre exacto) - ESTE ES EL CAMPO MÁS IMPORTANTE
 2. PRIORIDAD: SOLO "urgent" o "normal" (si no se menciona "urgente", usa "normal")
 3. FECHA: Si se menciona "mañana", "hoy", "el lunes", etc., conviértela a formato ISO (YYYY-MM-DD)
 4. TÍTULO: Un resumen corto y claro de la tarea
 
-REGLAS CRÍTICAS PARA CATEGORÍAS (MUY IMPORTANTE):
+⚠️ REGLAS CRÍTICAS PARA CATEGORÍAS (MUY IMPORTANTE - LEE CON ATENCIÓN):
 Las categorías disponibles son EXACTAMENTE estas (usa SOLO estos nombres exactos):
 {categories_text}
 
-INSTRUCCIONES PARA CATEGORÍAS:
-1. Analiza el texto buscando palabras clave relacionadas con cada categoría
-2. Si encuentras palabras relacionadas con una categoría, usa el NOMBRE EXACTO de esa categoría
-3. Si el texto menciona múltiples categorías posibles, elige la MÁS RELEVANTE según el contexto
-4. Si NO encuentras ninguna relación clara, devuelve null (no inventes categorías)
+INSTRUCCIONES OBLIGATORIAS PARA CATEGORÍAS:
+1. SIEMPRE debes intentar identificar una categoría. Solo devuelve null si es IMPOSIBLE determinar ninguna relación.
+2. Analiza TODO el texto buscando palabras clave relacionadas con cada categoría
+3. Si encuentras CUALQUIER palabra relacionada con una categoría, usa el NOMBRE EXACTO de esa categoría
+4. Si el texto menciona múltiples categorías posibles, elige la MÁS RELEVANTE según el contexto principal de la tarea
 5. IMPORTANTE: El nombre debe ser EXACTAMENTE uno de los nombres listados arriba, sin espacios extra ni mayúsculas
+6. Busca sinónimos, variaciones y palabras relacionadas (ver ejemplos abajo)
+7. Si el texto menciona acciones como "llamar", "visitar", "presupuesto", etc., asigna la categoría correspondiente
 
-EJEMPLOS DE MATCHING:
-- "tengo que llamar" → "llamar"
-- "hacer una visita" → "visitas"
-- "presupuesto para cliente" → "presupuestos"
-- "reclamación del cliente" → "reclamaciones"
-- "incidencia técnica" → "incidencias"
-- "tarea de administración" → "administracion"
-- "control de calidad" → "calidad"
-- "tarea comercial" → "comercial"
-- "idea para mejorar" → "ideas"
-- "tarea personal" → "personal"
-- "delegar a alguien" → "delegado"
-- "en espera de respuesta" → "en_espera"
+EJEMPLOS DE MATCHING (usa estos como referencia):
+- "tengo que llamar" / "llamar a" / "hacer una llamada" / "contactar por teléfono" → "llamar"
+- "hacer una visita" / "ir a ver" / "visitar" / "cita" → "visitas"
+- "presupuesto" / "cotización" / "precio" / "coste" → "presupuestos"
+- "reclamación" / "queja" / "reclamo" → "reclamaciones"
+- "incidencia" / "problema" / "fallo" / "error" / "bug" → "incidencias"
+- "administración" / "admin" / "papeles" / "documentación" / "trámite" → "administracion"
+- "calidad" / "control calidad" / "qc" → "calidad"
+- "comercial" / "ventas" / "venta" / "cliente nuevo" → "comercial"
+- "idea" / "ideas" / "sugerencia" / "propuesta" / "mejora" → "ideas"
+- "personal" / "privado" / "mío" → "personal"
+- "delegar" / "asignar" / "encargar" / "pasar a" → "delegado"
+- "en espera" / "esperando" / "pendiente" / "a la espera" → "en_espera"
+
+ANÁLISIS DE CONTEXTO:
+- Si el texto menciona "cliente" + acción comercial → "comercial"
+- Si el texto menciona "problema" o "fallo" → "incidencias"
+- Si el texto menciona "documentos" o "papeles" → "administracion"
+- Si el texto menciona "revisar" o "verificar" → considera "calidad" o "incidencias"
 
 FECHAS:
 - "mañana" = fecha de mañana
@@ -494,9 +502,22 @@ IMPORTANTE:
         
         user_prompt = f"""Categorías disponibles (usa SOLO estos nombres exactos): {', '.join(category_names) if category_names else 'Ninguna'}
 
-Texto a analizar: {text}
+Texto a analizar: "{text}"
 
-Analiza el texto y extrae la categoría más apropiada. Si no encuentras ninguna relación clara, devuelve null para category."""
+INSTRUCCIONES:
+1. Analiza el texto COMPLETO buscando palabras clave relacionadas con las categorías
+2. Identifica la categoría MÁS APROPIADA basándote en el contexto y las palabras clave
+3. Si encuentras CUALQUIER relación con una categoría, úsala (no devuelvas null a menos que sea absolutamente imposible)
+4. El texto puede mencionar acciones, objetos o conceptos que se relacionan con categorías específicas
+5. Usa el NOMBRE EXACTO de la categoría de la lista de arriba
+
+Ejemplos de análisis:
+- "necesito llamar al cliente mañana" → categoría: "llamar" (menciona "llamar")
+- "hacer presupuesto para el proyecto" → categoría: "presupuestos" (menciona "presupuesto")
+- "hay una incidencia con el servidor" → categoría: "incidencias" (menciona "incidencia")
+- "tengo que hacer papeles administrativos" → categoría: "administracion" (menciona "administrativos")
+
+Analiza el texto y extrae TODOS los campos, especialmente la categoría."""
         
         try:
             from openai import OpenAI
