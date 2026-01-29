@@ -1004,7 +1004,22 @@ class TelegramBotHandler:
                 if task.get('task_date'):
                     try:
                         task_dt = datetime.fromisoformat(task['task_date'])
-                        date_info = f" 📅 {task_dt.strftime('%d/%m/%Y')}"
+                        today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+                        tomorrow = today + timedelta(days=1)
+                        
+                        task_date_only = task_dt.date()
+                        today_date = today.date()
+                        tomorrow_date = tomorrow.date()
+                        
+                        if task_date_only == today_date:
+                            date_info = " 📆 Hoy"
+                        elif task_date_only == tomorrow_date:
+                            date_info = " 🌅 Mañana"
+                        else:
+                            # Día de la semana en español
+                            days_es = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
+                            day_name = days_es[task_dt.weekday()]
+                            date_info = f" 📅 {day_name}"
                     except (ValueError, TypeError):
                         pass
                 
@@ -1247,6 +1262,9 @@ class TelegramBotHandler:
         
         elif action == 'filter_tasks_today':
             await self._show_filtered_tasks(query, update, filter_type='today')
+        
+        elif action == 'filter_tasks_tomorrow':
+            await self._show_filtered_tasks(query, update, filter_type='tomorrow')
         
         elif action == 'filter_tasks_this_week':
             await self._show_filtered_tasks(query, update, filter_type='this_week')
@@ -1635,6 +1653,9 @@ class TelegramBotHandler:
             ],
             [
                 InlineKeyboardButton("📆 Hoy", callback_data="filter_tasks_today"),
+                InlineKeyboardButton("🌅 Mañana", callback_data="filter_tasks_tomorrow")
+            ],
+            [
                 InlineKeyboardButton("📅 Esta semana", callback_data="filter_tasks_this_week")
             ]
         ]
@@ -1655,6 +1676,9 @@ class TelegramBotHandler:
             ],
             [
                 InlineKeyboardButton("📆 Hoy", callback_data="filter_tasks_today"),
+                InlineKeyboardButton("🌅 Mañana", callback_data="filter_tasks_tomorrow")
+            ],
+            [
                 InlineKeyboardButton("📅 Esta semana", callback_data="filter_tasks_this_week")
             ]
         ]
@@ -1692,6 +1716,19 @@ class TelegramBotHandler:
                     except (ValueError, TypeError):
                         pass
             filter_name = "Hoy"
+        elif filter_type == 'tomorrow':
+            today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            tomorrow = today + timedelta(days=1)
+            tasks = []
+            for task in all_tasks:
+                if task.get('task_date'):
+                    try:
+                        task_dt = datetime.fromisoformat(task['task_date'].replace('Z', '+00:00'))
+                        if task_dt.date() == tomorrow.date():
+                            tasks.append(task)
+                    except (ValueError, TypeError):
+                        pass
+            filter_name = "Mañana"
         elif filter_type == 'this_week':
             today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
             # Lunes de esta semana
@@ -1720,6 +1757,33 @@ class TelegramBotHandler:
             )
             return
         
+        # Función helper para formatear fecha con prefijo
+        def format_task_date_with_prefix(task_date_str):
+            """Formatea fecha con prefijo: Hoy, Mañana o día de la semana"""
+            if not task_date_str:
+                return ""
+            try:
+                from datetime import datetime
+                task_dt = datetime.fromisoformat(task_date_str.replace('Z', '+00:00'))
+                today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+                tomorrow = today + timedelta(days=1)
+                
+                task_date_only = task_dt.date()
+                today_date = today.date()
+                tomorrow_date = tomorrow.date()
+                
+                if task_date_only == today_date:
+                    return "📆 Hoy"
+                elif task_date_only == tomorrow_date:
+                    return "🌅 Mañana"
+                else:
+                    # Día de la semana en español
+                    days_es = ['Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado', 'Domingo']
+                    day_name = days_es[task_dt.weekday()]
+                    return f"📅 {day_name}"
+            except:
+                return ""
+        
         keyboard = []
         for task in tasks[:10]:  # Máximo 10 tareas
             priority_emoji = {
@@ -1729,10 +1793,16 @@ class TelegramBotHandler:
                 'low': '🟢'
             }.get(task.get('priority', 'normal'), '🟡')
             
-            task_title = task['title'][:35] + "..." if len(task['title']) > 35 else task['title']
+            task_title = task['title'][:30] + "..." if len(task['title']) > 30 else task['title']
+            
+            # Agregar prefijo de fecha si tiene fecha
+            date_prefix = ""
+            if task.get('task_date'):
+                date_prefix = format_task_date_with_prefix(task['task_date']) + " "
+            
             keyboard.append([
                 InlineKeyboardButton(
-                    f"{priority_emoji} {task_title}",
+                    f"{date_prefix}{priority_emoji} {task_title}",
                     callback_data=f"view_task:{task['id']}"
                 )
             ])
