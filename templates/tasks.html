@@ -360,7 +360,10 @@
             <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-bottom: 1rem;">
                 <div class="form-group">
                     <label for="editTaskDate" style="display: block; margin-bottom: 0.5rem; font-weight: 600; color: #333;">Fecha:</label>
-                    <input type="date" id="editTaskDate" name="task_date" style="width: 100%; padding: 0.75rem; border: 1.5px solid #e0e0e0; border-radius: 6px; font-size: 1rem;">
+                    <div style="display: flex; gap: 0.5rem; align-items: flex-start;">
+                        <input type="date" id="editTaskDate" name="task_date" style="flex: 1; padding: 0.75rem; border: 1.5px solid #e0e0e0; border-radius: 6px; font-size: 1rem;">
+                        <button type="button" id="removeDateButton" onclick="removeTaskDate()" style="padding: 0.75rem 1rem; background-color: #f44336; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 0.9rem; white-space: nowrap; display: none;" title="Quitar fecha">🗑️ Sin fecha</button>
+                    </div>
                 </div>
                 
                 <div class="form-group">
@@ -968,7 +971,15 @@ async function openEditTaskModal(taskId) {
             document.getElementById('editDescription').value = task.description || '';
             document.getElementById('editStatus').value = task.status || 'open';
             document.getElementById('editPriority').value = task.priority || 'normal';
-            document.getElementById('editTaskDate').value = task.task_date ? task.task_date.split('T')[0] : '';
+            const taskDateInput = document.getElementById('editTaskDate');
+            const removeDateButton = document.getElementById('removeDateButton');
+            if (task.task_date) {
+                taskDateInput.value = task.task_date.split('T')[0];
+                removeDateButton.style.display = 'block';
+            } else {
+                taskDateInput.value = '';
+                removeDateButton.style.display = 'none';
+            }
             document.getElementById('editCategory').value = task.category || '';
             document.getElementById('editAmpliacion').value = task.ampliacion || '';
             
@@ -987,6 +998,24 @@ function closeEditTaskModal() {
     const modal = document.getElementById('editTaskModal');
     modal.style.display = 'none';
     document.getElementById('editTaskForm').reset();
+    // Resetear el botón de quitar fecha
+    document.getElementById('removeDateButton').style.display = 'none';
+    document.getElementById('editTaskDate').removeAttribute('data-remove-date');
+}
+
+// Función para quitar la fecha de la tarea
+function removeTaskDate() {
+    const taskDateInput = document.getElementById('editTaskDate');
+    const removeDateButton = document.getElementById('removeDateButton');
+    
+    // Limpiar el campo de fecha
+    taskDateInput.value = '';
+    
+    // Ocultar el botón
+    removeDateButton.style.display = 'none';
+    
+    // Marcar que se debe quitar la fecha (usando un atributo data)
+    taskDateInput.setAttribute('data-remove-date', 'true');
 }
 
 async function saveTaskEdit(event) {
@@ -998,18 +1027,29 @@ async function saveTaskEdit(event) {
     const saveButton = document.getElementById('saveTaskButton');
     
     // Convertir FormData a objeto
+    const taskDateInput = document.getElementById('editTaskDate');
+    const taskDateValue = formData.get('task_date');
+    
+    // Verificar si se debe quitar la fecha (botón "Sin fecha" presionado o campo vacío)
+    const shouldRemoveDate = taskDateInput.getAttribute('data-remove-date') === 'true' || !taskDateValue || taskDateValue === '';
+    
     const data = {
         title: formData.get('title'),
         description: formData.get('description') || null,
         status: formData.get('status'),
         priority: formData.get('priority'),
-        task_date: formData.get('task_date') || null,
+        // Enviar task_date: null si se debe quitar, o el valor si hay fecha
+        task_date: shouldRemoveDate ? null : taskDateValue,
         category: formData.get('category') || null,
         ampliacion: formData.get('ampliacion') || null
     };
     
-    // Limpiar valores vacíos
+    // Limpiar valores vacíos (excepto task_date que puede ser null para quitar la fecha)
     Object.keys(data).forEach(key => {
+        if (key === 'task_date') {
+            // task_date siempre se envía (null para quitar, o valor para establecer)
+            return;
+        }
         if (data[key] === '' || data[key] === null) {
             delete data[key];
         }
@@ -1041,6 +1081,23 @@ async function saveTaskEdit(event) {
         saveButton.textContent = '💾 Guardar Cambios';
     }
 }
+
+// Mostrar/ocultar botón según si hay fecha
+document.addEventListener('DOMContentLoaded', function() {
+    const taskDateInput = document.getElementById('editTaskDate');
+    const removeDateButton = document.getElementById('removeDateButton');
+    
+    if (taskDateInput && removeDateButton) {
+        taskDateInput.addEventListener('change', function() {
+            if (this.value) {
+                removeDateButton.style.display = 'block';
+                this.removeAttribute('data-remove-date');
+            } else {
+                removeDateButton.style.display = 'none';
+            }
+        });
+    }
+});
 
 // Cerrar modal al hacer clic fuera
 const originalOnClick = window.onclick;

@@ -277,10 +277,16 @@ class Database:
         
         for key, value in kwargs.items():
             if key in allowed_fields:
-                if isinstance(value, datetime):
+                # Manejar valores None/null para establecer NULL en la base de datos
+                if value is None:
+                    updates.append(f'{key} = NULL')
+                elif isinstance(value, datetime):
                     value = value.isoformat()
-                updates.append(f'{key} = ?')
-                params.append(value)
+                    updates.append(f'{key} = ?')
+                    params.append(value)
+                else:
+                    updates.append(f'{key} = ?')
+                    params.append(value)
         
         if updates:
             updates.append('updated_at = CURRENT_TIMESTAMP')

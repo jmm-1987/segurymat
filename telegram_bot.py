@@ -113,6 +113,67 @@ class TelegramBotHandler:
             del self.user_states[user.id]
             return
         
+        # Verificar si el usuario está editando solución
+        if user_state and user_state.get('action') == 'editing_solution':
+            task_id = user_state.get('task_id')
+            self.db.update_task(task_id, solution=text)
+            task = self.db.get_task_by_id(task_id)
+            await update.message.reply_text(
+                f"✅ Solución actualizada:\n\n"
+                f"📝 {task['title'] if task else 'Tarea'}\n\n"
+                f"💡 Solución:\n{text}",
+                reply_markup=self._get_reply_keyboard()
+            )
+            # Limpiar estado
+            del self.user_states[user.id]
+            return
+        
+        # Verificar si el usuario está editando tarea
+        if user_state and user_state.get('action') == 'editing_task':
+            task_id = user_state.get('task_id')
+            # Parsear el texto para detectar cambios
+            parsed = self.parser.parse(text)
+            entities = parsed.get('entities', {})
+            
+            # Actualizar campos detectados
+            update_data = {}
+            if entities.get('date'):
+                date_info = entities['date']
+                if date_info.get('parsed'):
+                    update_data['task_date'] = date_info['parsed']
+            if entities.get('priority'):
+                update_data['priority'] = entities['priority']
+            if entities.get('title'):
+                update_data['title'] = entities['title']
+            if entities.get('client'):
+                client_info = entities['client']
+                if client_info.get('id'):
+                    update_data['client_id'] = client_info['id']
+                elif client_info.get('name'):
+                    update_data['client_name_raw'] = client_info['name']
+            
+            if update_data:
+                self.db.update_task(task_id, **update_data)
+                task = self.db.get_task_by_id(task_id)
+                await update.message.reply_text(
+                    f"✅ Tarea actualizada:\n\n"
+                    f"📝 {task['title'] if task else 'Tarea'}\n\n"
+                    f"Cambios aplicados correctamente.",
+                    reply_markup=self._get_reply_keyboard()
+                )
+            else:
+                await update.message.reply_text(
+                    "ℹ️ No se detectaron cambios en la tarea. Intenta ser más específico.\n\n"
+                    "Ejemplos:\n"
+                    "- 'Cambiar fecha al lunes'\n"
+                    "- 'Cambiar prioridad a urgente'\n"
+                    "- 'Cambiar título a Reunión con cliente'",
+                    reply_markup=self._get_reply_keyboard()
+                )
+            # Limpiar estado
+            del self.user_states[user.id]
+            return
+        
         # Verificar si el usuario está creando tarea con imagen
         if user_state and user_state.get('action') == 'creating_task_with_image':
             # Procesar como creación de tarea normal pero con imagen adjunta
@@ -212,6 +273,67 @@ class TelegramBotHandler:
                 # Procesar como ampliación de tarea
                 task_id = user_state.get('task_id')
                 await self._add_ampliacion_to_task(update, task_id, transcript, user)
+                # Limpiar estado
+                del self.user_states[user.id]
+                return
+            
+            # Verificar si el usuario está editando solución
+            if user_state and user_state.get('action') == 'editing_solution':
+                task_id = user_state.get('task_id')
+                self.db.update_task(task_id, solution=transcript)
+                task = self.db.get_task_by_id(task_id)
+                await update.message.reply_text(
+                    f"✅ Solución actualizada:\n\n"
+                    f"📝 {task['title'] if task else 'Tarea'}\n\n"
+                    f"💡 Solución:\n{transcript}",
+                    reply_markup=self._get_reply_keyboard()
+                )
+                # Limpiar estado
+                del self.user_states[user.id]
+                return
+            
+            # Verificar si el usuario está editando tarea
+            if user_state and user_state.get('action') == 'editing_task':
+                task_id = user_state.get('task_id')
+                # Parsear el texto para detectar cambios
+                parsed = self.parser.parse(transcript)
+                entities = parsed.get('entities', {})
+                
+                # Actualizar campos detectados
+                update_data = {}
+                if entities.get('date'):
+                    date_info = entities['date']
+                    if date_info.get('parsed'):
+                        update_data['task_date'] = date_info['parsed']
+                if entities.get('priority'):
+                    update_data['priority'] = entities['priority']
+                if entities.get('title'):
+                    update_data['title'] = entities['title']
+                if entities.get('client'):
+                    client_info = entities['client']
+                    if client_info.get('id'):
+                        update_data['client_id'] = client_info['id']
+                    elif client_info.get('name'):
+                        update_data['client_name_raw'] = client_info['name']
+                
+                if update_data:
+                    self.db.update_task(task_id, **update_data)
+                    task = self.db.get_task_by_id(task_id)
+                    await update.message.reply_text(
+                        f"✅ Tarea actualizada:\n\n"
+                        f"📝 {task['title'] if task else 'Tarea'}\n\n"
+                        f"Cambios aplicados correctamente.",
+                        reply_markup=self._get_reply_keyboard()
+                    )
+                else:
+                    await update.message.reply_text(
+                        "ℹ️ No se detectaron cambios en la tarea. Intenta ser más específico.\n\n"
+                        "Ejemplos:\n"
+                        "- 'Cambiar fecha al lunes'\n"
+                        "- 'Cambiar prioridad a urgente'\n"
+                        "- 'Cambiar título a Reunión con cliente'",
+                        reply_markup=self._get_reply_keyboard()
+                    )
                 # Limpiar estado
                 del self.user_states[user.id]
                 return
@@ -1065,6 +1187,140 @@ class TelegramBotHandler:
                 reply_markup=self._get_action_buttons()
             )
         
+        elif action == 'view_task':
+            task_id = int(parts[1])
+            await self._show_task_details(query, update, task_id)
+        
+        elif action == 'complete_task_telegram':
+            task_id = int(parts[1])
+            task = self.db.get_task_by_id(task_id)
+            if task:
+                self.db.complete_task(task_id)
+                await query.edit_message_text(
+                    f"✅ Tarea completada:\n\n📝 {task['title']}",
+                    reply_markup=self._get_action_buttons()
+                )
+            else:
+                await query.edit_message_text("❌ Tarea no encontrada.", reply_markup=self._get_action_buttons())
+        
+        elif action == 'delete_task_telegram':
+            task_id = int(parts[1])
+            task = self.db.get_task_by_id(task_id)
+            if task:
+                # Mostrar confirmación
+                keyboard = [
+                    [
+                        InlineKeyboardButton("✅ Sí, eliminar", callback_data=f"confirm_delete_task:{task_id}"),
+                        InlineKeyboardButton("❌ No", callback_data=f"view_task:{task_id}")
+                    ]
+                ]
+                reply_markup = InlineKeyboardMarkup(keyboard)
+                await query.edit_message_text(
+                    f"⚠️ ¿Eliminar esta tarea?\n\n📝 {task['title']}\n\n"
+                    f"Esta acción no se puede deshacer.",
+                    reply_markup=reply_markup
+                )
+            else:
+                await query.edit_message_text("❌ Tarea no encontrada.", reply_markup=self._get_action_buttons())
+        
+        elif action == 'confirm_delete_task':
+            task_id = int(parts[1])
+            task = self.db.get_task_by_id(task_id)
+            task_title = task['title'] if task else "Tarea"
+            self.db.delete_task(task_id)
+            await query.edit_message_text(
+                f"🗑️ Tarea eliminada:\n\n📝 {task_title}",
+                reply_markup=self._get_action_buttons()
+            )
+        
+        elif action == 'ampliar_task_telegram':
+            task_id = int(parts[1])
+            task = self.db.get_task_by_id(task_id)
+            if task:
+                user = update.effective_user
+                self.user_states[user.id] = {
+                    'action': 'ampliar_task',
+                    'task_id': task_id
+                }
+                await query.edit_message_text(
+                    f"📝 Tarea seleccionada para ampliar:\n\n"
+                    f"📋 {task['title']}\n\n"
+                    f"🎤 Envía un mensaje de voz o texto con la ampliación."
+                )
+            else:
+                await query.edit_message_text("❌ Tarea no encontrada.", reply_markup=self._get_action_buttons())
+        
+        elif action == 'edit_task_telegram':
+            task_id = int(parts[1])
+            task = self.db.get_task_by_id(task_id)
+            if task:
+                await query.edit_message_text(
+                    f"✏️ Para editar la tarea:\n\n"
+                    f"📋 {task['title']}\n\n"
+                    f"Envía un mensaje de voz o texto con los cambios que quieres hacer.\n"
+                    f"Ejemplo: 'Cambiar fecha al lunes' o 'Cambiar prioridad a urgente'"
+                )
+                # Guardar estado para edición
+                user = update.effective_user
+                self.user_states[user.id] = {
+                    'action': 'editing_task',
+                    'task_id': task_id
+                }
+            else:
+                await query.edit_message_text("❌ Tarea no encontrada.", reply_markup=self._get_action_buttons())
+        
+        elif action == 'edit_solution_telegram':
+            task_id = int(parts[1])
+            task = self.db.get_task_by_id(task_id)
+            if task:
+                user = update.effective_user
+                self.user_states[user.id] = {
+                    'action': 'editing_solution',
+                    'task_id': task_id
+                }
+                solution_text = task.get('solution', '')
+                if solution_text:
+                    await query.edit_message_text(
+                        f"💡 Editar solución de la tarea:\n\n"
+                        f"📋 {task['title']}\n\n"
+                        f"Solución actual:\n{solution_text}\n\n"
+                        f"🎤 Envía un mensaje de voz o texto con la nueva solución."
+                    )
+                else:
+                    await query.edit_message_text(
+                        f"💡 Añadir solución a la tarea:\n\n"
+                        f"📋 {task['title']}\n\n"
+                        f"🎤 Envía un mensaje de voz o texto con la solución."
+                    )
+            else:
+                await query.edit_message_text("❌ Tarea no encontrada.", reply_markup=self._get_action_buttons())
+        
+        elif action == 'view_images':
+            task_id = int(parts[1])
+            images = self.db.get_task_images(task_id)
+            task = self.db.get_task_by_id(task_id)
+            if not images:
+                await query.edit_message_text(
+                    "📷 Esta tarea no tiene imágenes adjuntas.",
+                    reply_markup=InlineKeyboardMarkup([[
+                        InlineKeyboardButton("◀️ Volver", callback_data=f"view_task:{task_id}")
+                    ]])
+                )
+                return
+            
+            # Mostrar primera imagen y botones para navegar
+            # Nota: Para mostrar imágenes en Telegram necesitarías usar send_photo
+            # Por ahora solo mostramos información
+            await query.edit_message_text(
+                f"📷 Imágenes de la tarea:\n\n"
+                f"📝 {task['title'] if task else 'Tarea'}\n\n"
+                f"Total de imágenes: {len(images)}\n\n"
+                f"Las imágenes se pueden ver en el panel web.",
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("◀️ Volver", callback_data=f"view_task:{task_id}")
+                ]])
+            )
+        
         elif action == 'select_task_for_ampliar':
             task_id = int(parts[1])
             task = self.db.get_task_by_id(task_id)
@@ -1369,7 +1625,7 @@ class TelegramBotHandler:
             tasks = all_tasks
             filter_name = "Todas"
         
-        # Formatear mensaje
+        # Mostrar lista interactiva con botones
         if not tasks:
             await query.edit_message_text(
                 f"✅ No tienes tareas pendientes ({filter_name.lower()}).",
@@ -1377,8 +1633,8 @@ class TelegramBotHandler:
             )
             return
         
-        message = f"📋 Tareas pendientes ({filter_name}): {len(tasks)}\n\n"
-        for i, task in enumerate(tasks[:10], 1):  # Máximo 10 tareas
+        keyboard = []
+        for task in tasks[:10]:  # Máximo 10 tareas
             priority_emoji = {
                 'urgent': '🔴',
                 'high': '🟠',
@@ -1386,21 +1642,20 @@ class TelegramBotHandler:
                 'low': '🟢'
             }.get(task.get('priority', 'normal'), '🟡')
             
-            date_str = ""
-            if task.get('task_date'):
-                try:
-                    task_dt = datetime.fromisoformat(task['task_date'].replace('Z', '+00:00'))
-                    date_str = f" - 📅 {task_dt.strftime('%d/%m/%Y')}"
-                except:
-                    pass
-            
-            client_str = ""
-            if task.get('client_id'):
-                client = self.db.get_client_by_id(task['client_id'])
-                if client:
-                    client_str = f" - 👤 {client['name']}"
-            
-            message += f"{i}. {priority_emoji} {task['title']}{date_str}{client_str}\n"
+            task_title = task['title'][:35] + "..." if len(task['title']) > 35 else task['title']
+            keyboard.append([
+                InlineKeyboardButton(
+                    f"{priority_emoji} {task_title}",
+                    callback_data=f"view_task:{task['id']}"
+                )
+            ])
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await query.edit_message_text(
+            f"📋 Selecciona una tarea para ver detalles ({filter_name}):\n\n"
+            f"Tienes {len(tasks)} tarea(s) pendiente(s).",
+            reply_markup=reply_markup
+        )
         
         if len(tasks) > 10:
             message += f"\n... y {len(tasks) - 10} tarea(s) más."
@@ -1804,6 +2059,137 @@ class TelegramBotHandler:
                 reply_markup=reply_markup
             )
     
+    async def _show_task_details(self, query, update, task_id: int):
+        """Muestra todos los detalles de una tarea con ampliaciones y botones de acción"""
+        from utils import format_date
+        
+        task = self.db.get_task_by_id(task_id)
+        if not task:
+            await query.edit_message_text(
+                "❌ Tarea no encontrada.",
+                reply_markup=self._get_action_buttons()
+            )
+            return
+        
+        # Construir mensaje con todos los detalles
+        message_parts = []
+        
+        # Título
+        message_parts.append(f"📝 {task['title']}")
+        
+        # Cliente
+        if task.get('client_id'):
+            client = self.db.get_client_by_id(task['client_id'])
+            if client:
+                message_parts.append(f"\n👤 Cliente: {client['name']}")
+        elif task.get('client_name_raw'):
+            message_parts.append(f"\n👤 Cliente: {task['client_name_raw']} (sin asociar)")
+        
+        # Fecha
+        if task.get('task_date'):
+            task_dt = datetime.fromisoformat(task['task_date'].replace('Z', '+00:00'))
+            date_str = format_date(task_dt)
+            if task_dt.hour != 0 or task_dt.minute != 0:
+                date_str += f" {task_dt.strftime('%H:%M')}"
+            message_parts.append(f"\n📅 Fecha: {date_str}")
+        
+        # Categoría
+        if task.get('category'):
+            categories = self.db.get_all_categories()
+            category_obj = next((c for c in categories if c['name'] == task['category']), None)
+            if category_obj:
+                message_parts.append(f"\n📂 Categoría: {category_obj['icon']} {category_obj['display_name']}")
+            else:
+                message_parts.append(f"\n📂 Categoría: {task['category']}")
+        
+        # Prioridad
+        priority_emoji = {
+            'urgent': '🔴',
+            'high': '🟠',
+            'normal': '🟡',
+            'low': '🟢'
+        }.get(task.get('priority', 'normal'), '🟡')
+        priority_text = {
+            'urgent': 'Urgente',
+            'high': 'Alta',
+            'normal': 'Normal',
+            'low': 'Baja'
+        }.get(task.get('priority', 'normal'), 'Normal')
+        message_parts.append(f"\n{priority_emoji} Prioridad: {priority_text}")
+        
+        # Estado
+        status_emoji = {
+            'open': '🟦',
+            'completed': '✅',
+            'cancelled': '❌'
+        }.get(task.get('status', 'open'), '🟦')
+        status_text = {
+            'open': 'Abierta',
+            'completed': 'Completada',
+            'cancelled': 'Cancelada'
+        }.get(task.get('status', 'open'), 'Abierta')
+        message_parts.append(f"\n{status_emoji} Estado: {status_text}")
+        
+        # Descripción
+        if task.get('description'):
+            message_parts.append(f"\n\n📄 Descripción:\n{task['description']}")
+        
+        # Ampliaciones
+        if task.get('ampliacion'):
+            message_parts.append(f"\n\n📝 Ampliaciones:\n{task['ampliacion']}")
+        
+        # Solución
+        if task.get('solution'):
+            message_parts.append(f"\n\n💡 Solución:\n{task['solution']}")
+        
+        # Imágenes
+        images = self.db.get_task_images(task_id)
+        if images:
+            message_parts.append(f"\n\n📷 Imágenes adjuntas: {len(images)}")
+        
+        # Crear botones de acción
+        keyboard = []
+        
+        # Primera fila: Editar y Ampliar
+        keyboard.append([
+            InlineKeyboardButton("✏️ Editar", callback_data=f"edit_task_telegram:{task_id}"),
+            InlineKeyboardButton("📝 Ampliar", callback_data=f"ampliar_task_telegram:{task_id}")
+        ])
+        
+        # Segunda fila: Completar (solo si está abierta) y Eliminar
+        row2 = []
+        if task.get('status') == 'open':
+            row2.append(InlineKeyboardButton("✅ Completar", callback_data=f"complete_task_telegram:{task_id}"))
+        row2.append(InlineKeyboardButton("🗑️ Eliminar", callback_data=f"delete_task_telegram:{task_id}"))
+        if row2:
+            keyboard.append(row2)
+        
+        # Tercera fila: Ver imágenes y Solución
+        row3 = []
+        if images:
+            row3.append(InlineKeyboardButton("📷 Ver imágenes", callback_data=f"view_images:{task_id}"))
+        row3.append(InlineKeyboardButton("💡 Solución", callback_data=f"edit_solution_telegram:{task_id}"))
+        if row3:
+            keyboard.append(row3)
+        
+        # Botón volver
+        keyboard.append([
+            InlineKeyboardButton("◀️ Volver a lista", callback_data="show_pending_tasks")
+        ])
+        
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        
+        message = '\n'.join(message_parts)
+        
+        # Telegram tiene un límite de 4096 caracteres por mensaje
+        if len(message) > 4000:
+            message = message[:3900] + "\n\n... (mensaje truncado)"
+        
+        await query.edit_message_text(
+            message,
+            reply_markup=reply_markup
+        )
+    
     async def _handle_cancel_action(self, update, user):
         """Cancela cualquier proceso en curso del usuario"""
         reply_markup = self._get_reply_keyboard()
@@ -1829,7 +2215,9 @@ class TelegramBotHandler:
             'creating_task_with_image': 'creación de tarea con imagen',
             'waiting_image_action': 'acción de imagen',
             'waiting_task_for_image': 'asignación de imagen a tarea',
-            'assign_image_to_task': 'asignación de imagen'
+            'assign_image_to_task': 'asignación de imagen',
+            'editing_task': 'edición de tarea',
+            'editing_solution': 'edición de solución'
         }
         
         action_description = action_messages.get(action, 'proceso')

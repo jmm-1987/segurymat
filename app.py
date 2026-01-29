@@ -610,6 +610,10 @@ def update_task(task_id):
         if not task:
             return jsonify({'error': 'Tarea no encontrada'}), 404
         
+        # Convertir cadenas vacías de task_date a None para quitar la fecha
+        if 'task_date' in data and (data['task_date'] == '' or data['task_date'] is None):
+            data['task_date'] = None
+        
         # Actualizar tarea
         success = db.update_task(task_id, **data)
         
