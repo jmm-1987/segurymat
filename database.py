@@ -4,7 +4,10 @@ from datetime import datetime
 from typing import Optional, List, Dict
 from pathlib import Path
 import json
+import logging
 import config
+
+logger = logging.getLogger(__name__)
 
 
 class Database:
@@ -60,6 +63,33 @@ class Database:
             )
         ''')
         
+        # Tabla de usuarios web
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS web_users (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                username TEXT NOT NULL UNIQUE,
+                password_hash TEXT NOT NULL,
+                full_name TEXT NOT NULL,
+                is_master BOOLEAN DEFAULT 0,
+                is_active BOOLEAN DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+        ''')
+        
+        # Tabla de relación usuario-categoría (muchos a muchos)
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS user_categories (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                category_name TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES web_users(id) ON DELETE CASCADE,
+                FOREIGN KEY (category_name) REFERENCES categories(name) ON DELETE CASCADE,
+                UNIQUE(user_id, category_name)
+            )
+        ''')
+        
         # Tabla de tareas
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS tasks (
@@ -68,7 +98,7 @@ class Database:
                 user_name TEXT,
                 title TEXT NOT NULL,
                 description TEXT,
-                status TEXT DEFAULT 'open' CHECK(status IN ('open', 'completed', 'cancelled')),
+                status TEXT DEFAULT 'open' CHECK(status IN ('open', 'completed', 'cancelled', 'pending_approval')),
                 priority TEXT DEFAULT 'normal' CHECK(priority IN ('low', 'normal', 'high', 'urgent')),
                 task_date TIMESTAMP,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -78,9 +108,100 @@ class Database:
                 category TEXT,
                 google_event_id TEXT,
                 google_event_link TEXT,
+                ampliacion TEXT,
+                ampliacion_user TEXT,
+                solution TEXT,
+                solution_user TEXT,
                 FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE SET NULL
             )
         ''')
+        
+        # Migración: agregar campos ampliacion, ampliacion_user, solution, solution_user si no existen
+        try:
+            cursor.execute('ALTER TABLE tasks ADD COLUMN ampliacion TEXT')
+        except sqlite3.OperationalError:
+            pass  # Columna ya existe
+        
+        try:
+            cursor.execute('ALTER TABLE tasks ADD COLUMN ampliacion_user TEXT')
+        except sqlite3.OperationalError:
+            pass  # Columna ya existe
+        
+        try:
+            cursor.execute('ALTER TABLE tasks ADD COLUMN solution TEXT')
+        except sqlite3.OperationalError:
+            pass  # Columna ya existe
+        
+        try:
+            cursor.execute('ALTER TABLE tasks ADD COLUMN solution_user TEXT')
+        except sqlite3.OperationalError:
+            pass  # Columna ya existe
+        
+        # Migración: Actualizar CHECK constraint para incluir 'pending_approval'
+        # SQLite no permite modificar CHECK constraints directamente, así que necesitamos recrear la tabla
+        try:
+            # Verificar si la tabla existe
+            cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='tasks'")
+            if cursor.fetchone():
+                # Intentar insertar un registro con 'pending_approval' para verificar si el constraint lo permite
+                # Si falla, necesitamos recrear la tabla
+                try:
+                    cursor.execute("INSERT INTO tasks (user_id, title, status) VALUES (999999, 'test_migration', 'pending_approval')")
+                    cursor.execute("DELETE FROM tasks WHERE user_id = 999999 AND title = 'test_migration'")
+                    # Si llegamos aquí, el constraint ya permite 'pending_approval'
+                except sqlite3.IntegrityError:
+                    # El constraint no permite 'pending_approval', necesitamos recrear la tabla
+                    logger.info("Migrando tabla tasks para incluir 'pending_approval' en CHECK constraint...")
+                    
+                    # Crear tabla temporal con el constraint correcto
+                    cursor.execute('DROP TABLE IF EXISTS tasks_new')
+                    cursor.execute('''
+                        CREATE TABLE tasks_new (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            user_id INTEGER NOT NULL,
+                            user_name TEXT,
+                            title TEXT NOT NULL,
+                            description TEXT,
+                            status TEXT DEFAULT 'open' CHECK(status IN ('open', 'completed', 'cancelled', 'pending_approval')),
+                            priority TEXT DEFAULT 'normal' CHECK(priority IN ('low', 'normal', 'high', 'urgent')),
+                            task_date TIMESTAMP,
+                            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                            client_id INTEGER,
+                            client_name_raw TEXT,
+                            category TEXT,
+                            google_event_id TEXT,
+                            google_event_link TEXT,
+                            ampliacion TEXT,
+                            ampliacion_user TEXT,
+                            solution TEXT,
+                            solution_user TEXT,
+                            FOREIGN KEY (client_id) REFERENCES clients(id) ON DELETE SET NULL
+                        )
+                    ''')
+                    
+                    # Copiar datos
+                    cursor.execute('''
+                        INSERT INTO tasks_new 
+                        SELECT * FROM tasks
+                    ''')
+                    
+                    # Eliminar tabla antigua
+                    cursor.execute('DROP TABLE tasks')
+                    
+                    # Renombrar tabla nueva
+                    cursor.execute('ALTER TABLE tasks_new RENAME TO tasks')
+                    
+                    # Recrear índices
+                    cursor.execute('CREATE INDEX IF NOT EXISTS idx_tasks_user_id ON tasks(user_id)')
+                    cursor.execute('CREATE INDEX IF NOT EXISTS idx_tasks_status ON tasks(status)')
+                    cursor.execute('CREATE INDEX IF NOT EXISTS idx_tasks_client_id ON tasks(client_id)')
+                    
+                    conn.commit()
+                    logger.info("Tabla tasks migrada exitosamente con constraint actualizado para incluir 'pending_approval'")
+        except Exception as e:
+            logger.error(f"Error en migración de tabla tasks: {e}", exc_info=True)
+            conn.rollback()
         
         # Índices
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_tasks_user_id ON tasks(user_id)')
@@ -88,6 +209,9 @@ class Database:
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_tasks_client_id ON tasks(client_id)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_clients_normalized_name ON clients(normalized_name)')
         cursor.execute('CREATE INDEX IF NOT EXISTS idx_task_images_task_id ON task_images(task_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_user_categories_user_id ON user_categories(user_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_user_categories_category ON user_categories(category_name)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_web_users_username ON web_users(username)')
         
         # Inicializar categorías por defecto si no existen
         self._init_default_categories(cursor)
@@ -270,7 +394,8 @@ class Database:
         
         allowed_fields = ['title', 'description', 'status', 'priority',
                          'task_date', 'client_id', 'client_name_raw',
-                         'category', 'google_event_id', 'google_event_link']
+                         'category', 'google_event_id', 'google_event_link',
+                         'ampliacion', 'ampliacion_user', 'solution', 'solution_user']
         
         updates = []
         params = []
@@ -332,16 +457,18 @@ class Database:
     def _init_default_categories(self, cursor):
         """Inicializa categorías por defecto si no existen"""
         default_categories = [
+            ('personal', '👤', '#1ABC9C', 'Personal'),
+            ('delegado', '👥', '#16A085', 'Delegado'),
+            ('en_espera', '⏳', '#95A5A6', 'En Espera'),
             ('ideas', '💡', '#FFD700', 'Ideas'),
-            ('incidencias', '⚠️', '#FF6B6B', 'Incidencias'),
-            ('reclamaciones', '📢', '#FF4757', 'Reclamaciones'),
+            ('llamar', '📞', '#E67E22', 'Llamar'),
             ('presupuestos', '💰', '#2ECC71', 'Presupuestos'),
             ('visitas', '🏠', '#3498DB', 'Visitas'),
             ('administracion', '📋', '#9B59B6', 'Administración'),
-            ('en_espera', '⏳', '#95A5A6', 'En Espera'),
-            ('delegado', '👥', '#16A085', 'Delegado'),
-            ('llamar', '📞', '#E67E22', 'Llamar'),
-            ('personal', '👤', '#1ABC9C', 'Personal'),
+            ('reclamaciones', '📢', '#FF4757', 'Reclamaciones'),
+            ('calidad', '⭐', '#8E44AD', 'Calidad'),
+            ('comercial', '💼', '#34495E', 'Comercial'),
+            ('incidencias', '⚠️', '#FF6B6B', 'Incidencias'),
         ]
         
         for name, icon, color, display_name in default_categories:
@@ -429,6 +556,135 @@ class Database:
         success = cursor.rowcount > 0
         conn.close()
         return success
+    
+    # ========== USUARIOS WEB ==========
+    
+    def create_web_user(self, username: str, password_hash: str, full_name: str, is_master: bool = False) -> int:
+        """Crea un nuevo usuario web"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            INSERT INTO web_users (username, password_hash, full_name, is_master)
+            VALUES (?, ?, ?, ?)
+        ''', (username, password_hash, full_name, 1 if is_master else 0))
+        user_id = cursor.lastrowid
+        conn.commit()
+        conn.close()
+        return user_id
+    
+    def get_web_user_by_username(self, username: str) -> Optional[Dict]:
+        """Obtiene un usuario web por nombre de usuario"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM web_users WHERE username = ?', (username,))
+        row = cursor.fetchone()
+        conn.close()
+        return dict(row) if row else None
+    
+    def get_web_user_by_id(self, user_id: int) -> Optional[Dict]:
+        """Obtiene un usuario web por ID"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM web_users WHERE id = ?', (user_id,))
+        row = cursor.fetchone()
+        conn.close()
+        return dict(row) if row else None
+    
+    def get_all_web_users(self) -> List[Dict]:
+        """Obtiene todos los usuarios web"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('SELECT * FROM web_users ORDER BY created_at DESC')
+        rows = cursor.fetchall()
+        conn.close()
+        return [dict(row) for row in rows]
+    
+    def update_web_user(self, user_id: int, username: str = None, password_hash: str = None,
+                       full_name: str = None, is_active: bool = None):
+        """Actualiza un usuario web"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        updates = []
+        params = []
+        
+        if username is not None:
+            updates.append('username = ?')
+            params.append(username)
+        if password_hash is not None:
+            updates.append('password_hash = ?')
+            params.append(password_hash)
+        if full_name is not None:
+            updates.append('full_name = ?')
+            params.append(full_name)
+        if is_active is not None:
+            updates.append('is_active = ?')
+            params.append(1 if is_active else 0)
+        
+        if updates:
+            updates.append('updated_at = CURRENT_TIMESTAMP')
+            params.append(user_id)
+            cursor.execute(f'''
+                UPDATE web_users SET {', '.join(updates)}
+                WHERE id = ?
+            ''', params)
+            conn.commit()
+        
+        conn.close()
+    
+    def delete_web_user(self, user_id: int) -> bool:
+        """Elimina un usuario web"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('DELETE FROM web_users WHERE id = ?', (user_id,))
+        conn.commit()
+        success = cursor.rowcount > 0
+        conn.close()
+        return success
+    
+    def get_user_categories(self, user_id: int) -> List[str]:
+        """Obtiene las categorías permitidas para un usuario"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        cursor.execute('''
+            SELECT category_name FROM user_categories
+            WHERE user_id = ?
+        ''', (user_id,))
+        rows = cursor.fetchall()
+        conn.close()
+        return [row[0] for row in rows]
+    
+    def set_user_categories(self, user_id: int, category_names: List[str]):
+        """Establece las categorías permitidas para un usuario"""
+        conn = self.get_connection()
+        cursor = conn.cursor()
+        
+        # Eliminar categorías existentes
+        cursor.execute('DELETE FROM user_categories WHERE user_id = ?', (user_id,))
+        
+        # Agregar nuevas categorías
+        for category_name in category_names:
+            cursor.execute('''
+                INSERT INTO user_categories (user_id, category_name)
+                VALUES (?, ?)
+            ''', (user_id, category_name))
+        
+        conn.commit()
+        conn.close()
+    
+    def user_has_category_access(self, user_id: int, category_name: str) -> bool:
+        """Verifica si un usuario tiene acceso a una categoría"""
+        user = self.get_web_user_by_id(user_id)
+        if not user:
+            return False
+        
+        # El maestro tiene acceso a todas las categorías
+        if user.get('is_master'):
+            return True
+        
+        # Verificar si el usuario tiene acceso a esta categoría
+        categories = self.get_user_categories(user_id)
+        return category_name in categories
 
 
 # Instancia global

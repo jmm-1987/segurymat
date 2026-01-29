@@ -39,11 +39,7 @@ class TelegramBotHandler:
         keyboard = [
             [
                 KeyboardButton("📋 Mostrar tareas pendientes"),
-                KeyboardButton("✅ Cerrar tareas")
-            ],
-            [
-                KeyboardButton("❌ Cancelar"),
-                KeyboardButton("📝 Ampliar tareas")
+                KeyboardButton("❌ Cancelar")
             ]
         ]
         return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, is_persistent=True)
@@ -68,16 +64,6 @@ class TelegramBotHandler:
         if text == "📋 Mostrar tareas pendientes":
             user = update.effective_user
             await self._show_pending_tasks_filter_menu(update, user)
-            return
-        
-        if text == "✅ Cerrar tareas":
-            user = update.effective_user
-            await self._show_close_tasks_menu_text(update, user)
-            return
-        
-        if text == "📝 Ampliar tareas":
-            user = update.effective_user
-            await self._show_ampliar_tasks_menu_text(update, user)
             return
         
         if text == "❌ Cancelar":
@@ -116,7 +102,8 @@ class TelegramBotHandler:
         # Verificar si el usuario está editando solución
         if user_state and user_state.get('action') == 'editing_solution':
             task_id = user_state.get('task_id')
-            self.db.update_task(task_id, solution=text)
+            user_name = user.full_name if hasattr(user, 'full_name') else (user.username if hasattr(user, 'username') else f'Usuario {user.id}')
+            self.db.update_task(task_id, solution=text, solution_user=user_name)
             task = self.db.get_task_by_id(task_id)
             await update.message.reply_text(
                 f"✅ Solución actualizada:\n\n"
@@ -280,7 +267,8 @@ class TelegramBotHandler:
             # Verificar si el usuario está editando solución
             if user_state and user_state.get('action') == 'editing_solution':
                 task_id = user_state.get('task_id')
-                self.db.update_task(task_id, solution=transcript)
+                user_name = user.full_name if hasattr(user, 'full_name') else (user.username if hasattr(user, 'username') else f'Usuario {user.id}')
+                self.db.update_task(task_id, solution=transcript, solution_user=user_name)
                 task = self.db.get_task_by_id(task_id)
                 await update.message.reply_text(
                     f"✅ Solución actualizada:\n\n"
@@ -465,15 +453,29 @@ class TelegramBotHandler:
     
     async def _ask_category(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """Pregunta por la categoría de la tarea"""
-        # Obtener categorías de la base de datos
+        # Obtener categorías de la base de datos (ordenadas por nombre)
         categories = self.db.get_all_categories()
         
-        # Crear botones pequeños (2 por fila para que quepan bien)
+        # Identificar las últimas 5 categorías (las que tendrán botones más oscuros)
+        # Las categorías vienen ordenadas alfabéticamente por nombre
+        # Las últimas 5 en orden alfabético son: llamar, personal, presupuestos, reclamaciones, visitas
+        total_categories = len(categories)
+        last_five_indices = set(range(max(0, total_categories - 5), total_categories))
+        
+        # Crear botones en columnas de 2
         keyboard = []
         row = []
-        for category in categories:
-            # Botones pequeños con solo el icono y nombre corto
+        for idx, category in enumerate(categories):
+            # Botones con icono y nombre
             button_text = f"{category['icon']} {category['display_name']}"
+            
+            # Para las últimas 5 categorías, usar un estilo diferente (más oscuro visualmente)
+            # Como Telegram no permite cambiar el color directamente, usamos un emoji adicional
+            # que sugiere importancia o urgencia (🔸 para diferenciarlas visualmente)
+            if idx in last_five_indices:
+                # Para las últimas 5, añadimos un emoji adicional que las hace más visibles
+                button_text = f"🔸 {category['icon']} {category['display_name']}"
+            
             row.append(InlineKeyboardButton(button_text, callback_data=f"category:{category['name']}"))
             
             # Cada fila tiene 2 botones
@@ -557,7 +559,9 @@ class TelegramBotHandler:
             'delegado': 'delegado',
             'llamar': 'llamar',
             'llamada': 'llamar',
-            'personal': 'personal'
+            'personal': 'personal',
+            'calidad': 'calidad',
+            'comercial': 'comercial'
         }
         
         if not category:
@@ -1449,14 +1453,25 @@ class TelegramBotHandler:
     
     async def _ask_category_from_message(self, message, update):
         """Pregunta por categoría desde un mensaje"""
-        # Obtener categorías de la base de datos
+        # Obtener categorías de la base de datos (ordenadas por nombre)
         categories = self.db.get_all_categories()
         
-        # Crear botones pequeños (2 por fila)
+        # Identificar las últimas 5 categorías (las que tendrán botones más oscuros)
+        total_categories = len(categories)
+        last_five_indices = set(range(max(0, total_categories - 5), total_categories))
+        
+        # Crear botones en columnas de 2
         keyboard = []
         row = []
-        for category in categories:
+        for idx, category in enumerate(categories):
             button_text = f"{category['icon']} {category['display_name']}"
+            
+            # Para las últimas 5 categorías, usar un estilo diferente (más oscuro visualmente)
+            # Como Telegram no permite cambiar el color directamente, usamos un emoji adicional
+            if idx in last_five_indices:
+                # Para las últimas 5, añadimos un emoji adicional que las hace más visibles
+                button_text = f"🔸 {category['icon']} {category['display_name']}"
+            
             row.append(InlineKeyboardButton(button_text, callback_data=f"category:{category['name']}"))
             
             if len(row) == 2:
@@ -2044,8 +2059,9 @@ class TelegramBotHandler:
             else:
                 nueva_ampliacion = ampliacion_text
             
-            # Actualizar ampliación
-            self.db.update_task(task_id, ampliacion=nueva_ampliacion)
+            # Actualizar ampliación con nombre del usuario
+            user_name = user.full_name if hasattr(user, 'full_name') else (user.username if hasattr(user, 'username') else f'Usuario {user.id}')
+            self.db.update_task(task_id, ampliacion=nueva_ampliacion, ampliacion_user=user_name)
             
             await update.message.reply_text(
                 f"✅ Ampliación añadida a la tarea:\n\n"

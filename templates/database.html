@@ -1,9 +1,9 @@
 {% extends "base.html" %}
 
-{% block title %}Gestión de Base de Datos - Agenda Telegram{% endblock %}
+{% block title %}Configuración - Agenda Telegram{% endblock %}
 
 {% block content %}
-<h2>Gestión de Base de Datos</h2>
+<h2>⚙️ Configuración</h2>
 
 <div class="database-management">
     <!-- Sección de Exportar -->
@@ -280,6 +280,74 @@ function mostrarMensaje(mensaje, tipo, contenedor = null) {
     background-color: #e3f2fd;
     color: #1976d2;
     border: 1px solid #90caf9;
+}
+
+/* Estilos para modal */
+.modal {
+    display: none;
+    position: fixed;
+    z-index: 1000;
+    left: 0;
+    top: 0;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    background-color: rgba(0,0,0,0.5);
+}
+
+.modal-content {
+    background-color: #fefefe;
+    margin: 5% auto;
+    padding: 2rem;
+    border: 1px solid #888;
+    border-radius: 8px;
+    width: 90%;
+    max-width: 600px;
+}
+
+.close {
+    color: #aaa;
+    float: right;
+    font-size: 28px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+.close:hover,
+.close:focus {
+    color: #000;
+    text-decoration: none;
+}
+
+.btn-sm {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.85rem;
+}
+
+.btn-secondary {
+    background-color: #6c757d;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.btn-secondary:hover {
+    background-color: #5a6268;
+}
+
+.btn-danger {
+    background-color: #dc3545;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+}
+
+.btn-danger:hover {
+    background-color: #c82333;
 }
 </style>
 {% endblock %}

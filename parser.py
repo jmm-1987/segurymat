@@ -419,7 +419,19 @@ PRIORIDADES (MUY IMPORTANTE):
 
 CATEGORÍAS:
 - Debes elegir UNA de las categorías disponibles
+- Las categorías disponibles son: personal, delegado, en_espera, ideas, llamar, presupuestos, visitas, administracion, reclamaciones, calidad, comercial, incidencias
 - Si el texto menciona algo relacionado con una categoría, úsala
+- Variaciones comunes:
+  * "idea" o "ideas" → ideas
+  * "incidencia" o "incidencias" → incidencias
+  * "reclamación" o "reclamaciones" → reclamaciones
+  * "presupuesto" o "presupuestos" → presupuestos
+  * "visita" o "visitas" → visitas
+  * "administración" o "admin" → administracion
+  * "en espera" o "espera" → en_espera
+  * "llamada" o "llamar" → llamar
+  * "calidad" → calidad
+  * "comercial" → comercial
 - Si no está claro, elige la más apropiada o usa null
 
 Responde SOLO con un JSON válido (sin texto adicional):

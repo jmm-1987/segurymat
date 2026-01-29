@@ -7,8 +7,13 @@
     <div class="task-card-body">
         {% if task.ampliacion %}
         <div class="task-ampliacion" style="margin-bottom: 1rem; padding: 0.75rem; background: #f0f7ff; border-radius: 6px; border-left: 3px solid #4285F4;">
-            <strong style="color: #4285F4; font-size: 0.85rem;">📄 Ampliación:</strong>
-            <p style="margin: 0.5rem 0 0 0; color: #495057; font-size: 0.9rem; white-space: pre-wrap;">{{ task.ampliacion }}</p>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                <strong style="color: #4285F4; font-size: 0.85rem;">📄 Ampliación:</strong>
+                {% if task.ampliacion_user %}
+                <small style="color: #6c757d; font-size: 0.75rem;">por {{ task.ampliacion_user }}</small>
+                {% endif %}
+            </div>
+            <p style="margin: 0; color: #495057; font-size: 0.9rem; white-space: pre-wrap;">{{ task.ampliacion }}</p>
         </div>
         {% endif %}
         
@@ -43,8 +48,13 @@
         
         {% if task.solution %}
         <div class="task-solution" style="margin-top: 1rem; padding: 0.75rem; background: #f8f9fa; border-radius: 6px; border-left: 3px solid #1e3a5f;">
-            <strong style="color: #1e3a5f; font-size: 0.85rem;">💡 Solución:</strong>
-            <p style="margin: 0.5rem 0 0 0; color: #495057; font-size: 0.9rem; white-space: pre-wrap;">{{ task.solution }}</p>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 0.5rem;">
+                <strong style="color: #1e3a5f; font-size: 0.85rem;">💡 Solución:</strong>
+                {% if task.solution_user %}
+                <small style="color: #6c757d; font-size: 0.75rem;">por {{ task.solution_user }}</small>
+                {% endif %}
+            </div>
+            <p style="margin: 0; color: #495057; font-size: 0.9rem; white-space: pre-wrap;">{{ task.solution }}</p>
         </div>
         {% endif %}
     </div>
@@ -78,20 +88,27 @@
                     📎
                 </button>
                 {% endif %}
+                <button type="button" class="btn-action-icon btn-ampliar-icon" data-task-id="{{ task.id }}" data-task-title="{{ task.title|e }}" onclick="openAmpliarModal({{ task.id }}, '{{ task.title|e }}')" title="Ampliar tarea">
+                    📝
+                </button>
                 <button type="button" class="btn-action-icon btn-solution-icon" data-task-id="{{ task.id }}" data-task-title="{{ task.title|e }}" data-solution="{{ task.solution|tojson|e if task.solution else '' }}" onclick="openSolutionModalFromButton(this)" title="{% if task.solution %}Editar Solución{% else %}Añadir Solución{% endif %}">
                     💡
                 </button>
                 <button type="button" class="btn-action-icon btn-google-calendar-icon" onclick="return false;" title="Añadir a Google Calendar">
                     📅
                 </button>
-                {% if task.status == 'open' %}
+                {% if task.status == 'open' or task.status == 'pending_approval' %}
                 <form method="POST" action="{{ url_for('complete_task', task_id=task.id) }}" style="display: inline;" onsubmit="return true;">
-                    <button type="submit" class="btn-action-icon btn-success-icon" title="Completar tarea">✅</button>
+                    <button type="submit" class="btn-action-icon btn-success-icon" title="{% if task.status == 'pending_approval' %}Aprobar tarea{% else %}Completar tarea{% endif %}">
+                        {% if task.status == 'pending_approval' %}✓{% else %}✅{% endif %}
+                    </button>
                 </form>
                 {% endif %}
+                {% if session.get('is_master') %}
                 <form method="POST" action="{{ url_for('delete_task', task_id=task.id) }}" style="display: inline;" onsubmit="return confirm('¿Eliminar esta tarea?');">
                     <button type="submit" class="btn-action-icon btn-danger-icon" title="Eliminar tarea">🗑️</button>
                 </form>
+                {% endif %}
             </div>
         </div>
     </div>

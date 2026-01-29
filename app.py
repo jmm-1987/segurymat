@@ -133,32 +133,79 @@ else:
 
 # ========== AUTHENTICATION ==========
 
+from werkzeug.security import generate_password_hash, check_password_hash
+
+def init_master_user():
+    """Inicializa el usuario maestro si no existe"""
+    db = database.db
+    master_user = db.get_web_user_by_username('master')
+    if not master_user:
+        # Crear usuario maestro con la contraseña del admin
+        password_hash = generate_password_hash(config.ADMIN_PASSWORD)
+        db.create_web_user('master', password_hash, 'Usuario Maestro', is_master=True)
+        logger.info("Usuario maestro creado automáticamente")
+
+# Inicializar usuario maestro al arrancar
+init_master_user()
+
 def login_required(f):
     """Decorador para requerir login"""
     @wraps(f)
     def decorated_function(*args, **kwargs):
-        if 'logged_in' not in session:
+        if 'user_id' not in session:
             return redirect(url_for('login'))
         return f(*args, **kwargs)
     return decorated_function
 
+def master_required(f):
+    """Decorador para requerir que el usuario sea maestro"""
+    @wraps(f)
+    def decorated_function(*args, **kwargs):
+        if 'user_id' not in session:
+            return redirect(url_for('login'))
+        db = database.db
+        user = db.get_web_user_by_id(session['user_id'])
+        if not user or not user.get('is_master'):
+            return redirect(url_for('tasks'))
+        return f(*args, **kwargs)
+    return decorated_function
+
+def get_current_user():
+    """Obtiene el usuario actual desde la sesión"""
+    if 'user_id' not in session:
+        return None
+    db = database.db
+    return db.get_web_user_by_id(session['user_id'])
 
 @app.route('/admin/login', methods=['GET', 'POST'])
 def login():
-    """Login de administrador"""
+    """Login de usuarios"""
     if request.method == 'POST':
+        username = request.form.get('username', '').strip()
         password = request.form.get('password', '')
-        if password == config.ADMIN_PASSWORD:
-            session['logged_in'] = True
+        
+        if not username or not password:
+            return render_template('login.html', error='Usuario y contraseña requeridos')
+        
+        db = database.db
+        user = db.get_web_user_by_username(username)
+        
+        if user and user.get('is_active') and check_password_hash(user['password_hash'], password):
+            session['user_id'] = user['id']
+            session['username'] = user['username']
+            session['is_master'] = user.get('is_master', False)
+            session['full_name'] = user.get('full_name', username)
             return redirect(url_for('tasks'))
-        return render_template('login.html', error='Contraseña incorrecta')
+        
+        return render_template('login.html', error='Usuario o contraseña incorrectos')
+    
     return render_template('login.html')
 
 
 @app.route('/admin/logout')
 def logout():
     """Logout"""
-    session.pop('logged_in', None)
+    session.clear()
     return redirect(url_for('login'))
 
 
@@ -322,6 +369,10 @@ def tasks():
     """Vista de tareas"""
     from datetime import datetime
     
+    current_user = get_current_user()
+    if not current_user:
+        return redirect(url_for('login'))
+    
     status = request.args.get('status', 'open')  # Por defecto mostrar tareas abiertas
     priority = request.args.get('priority', 'all')
     category = request.args.get('category', 'all')
@@ -335,6 +386,11 @@ def tasks():
     db = database.db
     tasks_list = db.get_tasks()
     categories_list = db.get_all_categories()  # Obtener categorías de la BD
+    
+    # Filtrar por categorías permitidas si no es maestro
+    if not current_user.get('is_master'):
+        allowed_categories = db.get_user_categories(current_user['id'])
+        tasks_list = [t for t in tasks_list if not t.get('category') or t.get('category') in allowed_categories]
     
     # Filtrar
     if status != 'all':
@@ -547,12 +603,26 @@ def delete_client(client_id):
 
 
 @app.route('/admin/categories')
-@login_required
+@master_required
 def categories():
-    """Vista de edición de categorías"""
+    """Vista de edición de categorías y usuarios (solo para maestros)"""
     db = database.db
     categories_list = db.get_all_categories()
-    return render_template('categories.html', categories=categories_list)
+    
+    # Si es maestro, obtener usuarios para gestión
+    users_with_categories = []
+    if get_current_user() and get_current_user().get('is_master'):
+        users_list = db.get_all_web_users()
+        for user in users_list:
+            user_categories = db.get_user_categories(user['id'])
+            users_with_categories.append({
+                **user,
+                'categories': user_categories
+            })
+    
+    return render_template('categories.html', 
+                          categories=categories_list,
+                          users=users_with_categories if users_with_categories else None)
 
 
 @app.route('/admin/categories/<int:category_id>/update', methods=['POST'])
@@ -579,6 +649,220 @@ def update_category(category_id):
 def database_management():
     """Vista de gestión de base de datos"""
     return render_template('database.html')
+
+
+# ========== GESTIÓN DE USUARIOS ==========
+
+@app.route('/admin/users')
+@master_required
+def users():
+    """Vista de gestión de usuarios"""
+    db = database.db
+    users_list = db.get_all_web_users()
+    categories_list = db.get_all_categories()
+    
+    # Obtener categorías de cada usuario
+    users_with_categories = []
+    for user in users_list:
+        user_categories = db.get_user_categories(user['id'])
+        users_with_categories.append({
+            **user,
+            'categories': user_categories
+        })
+    
+    return render_template('users.html', users=users_with_categories, categories=categories_list)
+
+
+@app.route('/admin/users/create', methods=['POST'])
+@master_required
+def create_user():
+    """Crear nuevo usuario"""
+    try:
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '').strip()
+        full_name = request.form.get('full_name', '').strip()
+        category_names = request.form.getlist('categories')
+        
+        if not username or not password or not full_name:
+            return jsonify({'error': 'Usuario, contraseña y nombre completo requeridos'}), 400
+        
+        db = database.db
+        
+        # Verificar que el usuario no existe
+        if db.get_web_user_by_username(username):
+            return jsonify({'error': 'El usuario ya existe'}), 400
+        
+        # Crear usuario
+        password_hash = generate_password_hash(password)
+        user_id = db.create_web_user(username, password_hash, full_name, is_master=False)
+        
+        # Asignar categorías
+        if category_names:
+            db.set_user_categories(user_id, category_names)
+        
+        return jsonify({'success': True, 'user_id': user_id})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/admin/users/<int:user_id>')
+@master_required
+def get_user(user_id):
+    """Obtiene los datos de un usuario para editar"""
+    try:
+        db = database.db
+        user = db.get_web_user_by_id(user_id)
+        
+        if not user:
+            return jsonify({'error': 'Usuario no encontrado'}), 404
+        
+        # Obtener categorías del usuario
+        categories = db.get_user_categories(user_id)
+        user['categories'] = categories
+        
+        return jsonify(user)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/admin/users/<int:user_id>/update', methods=['POST'])
+@master_required
+def update_user(user_id):
+    """Actualizar usuario"""
+    try:
+        username = request.form.get('username', '').strip()
+        password = request.form.get('password', '').strip()
+        full_name = request.form.get('full_name', '').strip()
+        is_active = request.form.get('is_active') == 'on'
+        category_names = request.form.getlist('categories')
+        
+        db = database.db
+        
+        # Verificar que el usuario existe
+        user = db.get_web_user_by_id(user_id)
+        if not user:
+            return jsonify({'error': 'Usuario no encontrado'}), 404
+        
+        # No permitir modificar al usuario maestro
+        if user.get('is_master'):
+            return jsonify({'error': 'No se puede modificar el usuario maestro'}), 400
+        
+        # Actualizar datos
+        update_data = {}
+        if username and username != user['username']:
+            # Verificar que el nuevo username no existe
+            if db.get_web_user_by_username(username):
+                return jsonify({'error': 'El nombre de usuario ya existe'}), 400
+            update_data['username'] = username
+        
+        if password:
+            update_data['password_hash'] = generate_password_hash(password)
+        
+        if full_name:
+            update_data['full_name'] = full_name
+        
+        update_data['is_active'] = is_active
+        
+        db.update_web_user(user_id, **update_data)
+        
+        # Actualizar categorías
+        if category_names is not None:
+            db.set_user_categories(user_id, category_names)
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/admin/users/<int:user_id>/delete', methods=['POST'])
+@master_required
+def delete_user(user_id):
+    """Eliminar usuario"""
+    try:
+        db = database.db
+        user = db.get_web_user_by_id(user_id)
+        
+        if not user:
+            return jsonify({'error': 'Usuario no encontrado'}), 404
+        
+        # No permitir eliminar al usuario maestro
+        if user.get('is_master'):
+            return jsonify({'error': 'No se puede eliminar el usuario maestro'}), 400
+        
+        db.delete_web_user(user_id)
+        return jsonify({'success': True})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
+@app.route('/admin/tasks/pending_approval')
+@master_required
+def pending_approval_tasks():
+    """Vista de tareas pendientes de aprobación"""
+    db = database.db
+    tasks_list = db.get_tasks(status='pending_approval')
+    
+    return render_template('tasks.html', 
+                          tasks=tasks_list, 
+                          status='pending_approval',
+                          view_mode='list',
+                          categories=db.get_all_categories(),
+                          clients=db.get_all_clients())
+
+
+@app.route('/admin/tasks/<int:task_id>/approve', methods=['POST'])
+@master_required
+def approve_task(task_id):
+    """Aprobar tarea completada"""
+    db = database.db
+    db.complete_task(task_id)
+    return redirect(url_for('tasks'))
+
+
+@app.route('/admin/tasks/create', methods=['POST'])
+@login_required
+def create_task():
+    """Crea una nueva tarea desde el panel web"""
+    try:
+        data = request.get_json()
+        current_user = get_current_user()
+        
+        if not current_user:
+            return jsonify({'error': 'Usuario no autenticado'}), 401
+        
+        db = database.db
+        
+        # Validar datos requeridos
+        title = data.get('title', '').strip()
+        if not title:
+            return jsonify({'error': 'El título es requerido'}), 400
+        
+        # Parsear fecha si existe
+        task_date = None
+        if data.get('task_date'):
+            from datetime import datetime
+            try:
+                task_date = datetime.strptime(data.get('task_date'), '%Y-%m-%d')
+            except ValueError:
+                return jsonify({'error': 'Formato de fecha inválido'}), 400
+        
+        # Crear tarea
+        task_id = db.create_task(
+            user_id=current_user['id'],
+            user_name=current_user.get('full_name') or current_user.get('username', 'Usuario Web'),
+            title=title,
+            description=data.get('description'),
+            priority=data.get('priority', 'normal'),
+            task_date=task_date,
+            client_id=None,
+            client_name_raw=None,
+            category=data.get('category')
+        )
+        
+        return jsonify({'success': True, 'task_id': task_id})
+    except Exception as e:
+        logger.error(f"Error al crear tarea: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
 
 
 @app.route('/admin/tasks/<int:task_id>/edit')
@@ -628,9 +912,17 @@ def update_task(task_id):
 @app.route('/admin/tasks/<int:task_id>/complete', methods=['POST'])
 @login_required
 def complete_task(task_id):
-    """Completar tarea"""
+    """Completar tarea (requiere aprobación del maestro si no es maestro)"""
+    current_user = get_current_user()
     db = database.db
-    db.complete_task(task_id)
+    
+    if current_user.get('is_master'):
+        # El maestro puede completar directamente
+        db.complete_task(task_id)
+    else:
+        # Usuarios normales marcan como pendiente de aprobación
+        db.update_task(task_id, status='pending_approval')
+    
     return redirect(url_for('tasks'))
 
 
@@ -643,13 +935,56 @@ def delete_task(task_id):
     return redirect(url_for('tasks'))
 
 
+@app.route('/admin/tasks/<int:task_id>/ampliar', methods=['POST'])
+@login_required
+def ampliar_task(task_id):
+    """Añade una ampliación a una tarea (concatena con las existentes)"""
+    try:
+        data = request.get_json()
+        ampliacion_text = data.get('ampliacion', '').strip()
+        
+        if not ampliacion_text:
+            return jsonify({'error': 'La ampliación no puede estar vacía'}), 400
+        
+        db = database.db
+        current_user = get_current_user()
+        
+        # Obtener la tarea actual
+        task = db.get_task_by_id(task_id)
+        if not task:
+            return jsonify({'error': 'Tarea no encontrada'}), 404
+        
+        # Obtener ampliación existente si hay
+        ampliacion_existente = task.get('ampliacion', '') or ''
+        
+        # Si ya hay ampliación, añadir nueva línea y concatenar
+        if ampliacion_existente:
+            nueva_ampliacion = ampliacion_existente + "\n\n" + ampliacion_text
+        else:
+            nueva_ampliacion = ampliacion_text
+        
+        # Actualizar ampliación con nombre del usuario
+        user_name = current_user.get('full_name') or current_user.get('username', 'Usuario Web')
+        db.update_task(task_id, ampliacion=nueva_ampliacion, ampliacion_user=user_name)
+        
+        return jsonify({'success': True})
+    except Exception as e:
+        logger.error(f"Error al ampliar tarea: {e}", exc_info=True)
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/admin/tasks/<int:task_id>/solution', methods=['POST'])
 @login_required
 def update_task_solution(task_id):
     """Actualizar solución/resolución de tarea"""
+    current_user = get_current_user()
     solution = request.form.get('solution', '').strip()
     db = database.db
-    db.update_task(task_id, solution=solution if solution else None)
+    db.update_task(
+        task_id, 
+        solution=solution if solution else None,
+        solution_user=current_user.get('full_name', current_user.get('username', '')) if solution else None
+    )
     return redirect(url_for('tasks'))
 
 
