@@ -1,10 +1,11 @@
 """Modelos de base de datos SQLite"""
 import sqlite3
 from datetime import datetime
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Callable
 from pathlib import Path
 import json
 import logging
+import time
 import config
 
 logger = logging.getLogger(__name__)
@@ -17,16 +18,49 @@ class Database:
         self.db_path = db_path or config.SQLITE_PATH
         self.init_db()
     
+    def _retry_on_locked(self, func: Callable, max_retries: int = 3, delay: float = 0.1):
+        """Reintenta una operación si la base de datos está bloqueada"""
+        for attempt in range(max_retries):
+            try:
+                return func()
+            except sqlite3.OperationalError as e:
+                if "locked" in str(e).lower() and attempt < max_retries - 1:
+                    wait_time = delay * (2 ** attempt)  # Backoff exponencial
+                    logger.warning(f"Base de datos bloqueada, reintentando en {wait_time}s (intento {attempt + 1}/{max_retries})")
+                    time.sleep(wait_time)
+                    continue
+                raise
+    
     def get_connection(self):
-        """Obtiene conexión a la base de datos"""
-        conn = sqlite3.connect(self.db_path)
+        """Obtiene conexión a la base de datos con timeout y WAL mode"""
+        conn = sqlite3.connect(self.db_path, timeout=30.0)
         conn.row_factory = sqlite3.Row
+        # Habilitar WAL mode para mejor concurrencia
+        try:
+            conn.execute('PRAGMA journal_mode=WAL')
+        except sqlite3.OperationalError:
+            # Si falla, continuar sin WAL (puede pasar en algunos sistemas)
+            pass
         return conn
     
     def init_db(self):
         """Inicializa las tablas de la base de datos"""
         conn = self.get_connection()
         cursor = conn.cursor()
+        
+        # Configurar WAL mode para mejor concurrencia (permite lecturas concurrentes)
+        try:
+            cursor.execute('PRAGMA journal_mode=WAL')
+            logger.info("Modo WAL habilitado para mejor concurrencia")
+        except sqlite3.OperationalError as e:
+            logger.warning(f"No se pudo habilitar WAL mode: {e}")
+        
+        # Configurar otros pragmas para mejor rendimiento
+        try:
+            cursor.execute('PRAGMA synchronous=NORMAL')  # Balance entre seguridad y rendimiento
+            cursor.execute('PRAGMA busy_timeout=30000')  # 30 segundos de timeout
+        except sqlite3.OperationalError:
+            pass
         
         # Tabla de clientes
         cursor.execute('''
@@ -336,25 +370,32 @@ class Database:
                     description: str = None, priority: str = 'normal',
                     task_date: datetime = None, client_id: int = None,
                     client_name_raw: str = None, category: str = None) -> int:
-        """Crea una nueva tarea"""
-        conn = self.get_connection()
-        cursor = conn.cursor()
+        """Crea una nueva tarea con reintentos automáticos si la BD está bloqueada"""
+        def _create():
+            conn = None
+            try:
+                conn = self.get_connection()
+                cursor = conn.cursor()
+                
+                task_date_str = task_date.isoformat() if task_date else None
+                
+                cursor.execute('''
+                    INSERT INTO tasks (
+                        user_id, user_name, title, description, priority,
+                        task_date, client_id, client_name_raw, category
+                    )
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ''', (user_id, user_name, title, description, priority,
+                      task_date_str, client_id, client_name_raw, category))
+                
+                task_id = cursor.lastrowid
+                conn.commit()
+                return task_id
+            finally:
+                if conn:
+                    conn.close()
         
-        task_date_str = task_date.isoformat() if task_date else None
-        
-        cursor.execute('''
-            INSERT INTO tasks (
-                user_id, user_name, title, description, priority,
-                task_date, client_id, client_name_raw, category
-            )
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (user_id, user_name, title, description, priority,
-              task_date_str, client_id, client_name_raw, category))
-        
-        task_id = cursor.lastrowid
-        conn.commit()
-        conn.close()
-        return task_id
+        return self._retry_on_locked(_create)
     
     def get_task_by_id(self, task_id: int) -> Optional[Dict]:
         """Obtiene tarea por ID"""
@@ -401,45 +442,52 @@ class Database:
         return [dict(row) for row in rows]
     
     def update_task(self, task_id: int, **kwargs) -> bool:
-        """Actualiza tarea"""
-        conn = self.get_connection()
-        cursor = conn.cursor()
-        
-        allowed_fields = ['title', 'description', 'status', 'priority',
-                         'task_date', 'client_id', 'client_name_raw',
-                         'category', 'google_event_id', 'google_event_link',
-                         'ampliacion', 'ampliacion_user', 'solution', 'solution_user']
-        
-        updates = []
-        params = []
-        
-        for key, value in kwargs.items():
-            if key in allowed_fields:
-                # Manejar valores None/null para establecer NULL en la base de datos
-                if value is None:
-                    updates.append(f'{key} = NULL')
-                elif isinstance(value, datetime):
-                    value = value.isoformat()
-                    updates.append(f'{key} = ?')
-                    params.append(value)
+        """Actualiza tarea con reintentos automáticos si la BD está bloqueada"""
+        def _update():
+            conn = None
+            try:
+                conn = self.get_connection()
+                cursor = conn.cursor()
+                
+                allowed_fields = ['title', 'description', 'status', 'priority',
+                                 'task_date', 'client_id', 'client_name_raw',
+                                 'category', 'google_event_id', 'google_event_link',
+                                 'ampliacion', 'ampliacion_user', 'solution', 'solution_user']
+                
+                updates = []
+                params = []
+                
+                for key, value in kwargs.items():
+                    if key in allowed_fields:
+                        # Manejar valores None/null para establecer NULL en la base de datos
+                        if value is None:
+                            updates.append(f'{key} = NULL')
+                        elif isinstance(value, datetime):
+                            value = value.isoformat()
+                            updates.append(f'{key} = ?')
+                            params.append(value)
+                        else:
+                            updates.append(f'{key} = ?')
+                            params.append(value)
+                
+                if updates:
+                    updates.append('updated_at = CURRENT_TIMESTAMP')
+                    params.append(task_id)
+                    cursor.execute(f'''
+                        UPDATE tasks SET {', '.join(updates)}
+                        WHERE id = ?
+                    ''', params)
+                    conn.commit()
+                    success = cursor.rowcount > 0
                 else:
-                    updates.append(f'{key} = ?')
-                    params.append(value)
+                    success = False
+                
+                return success
+            finally:
+                if conn:
+                    conn.close()
         
-        if updates:
-            updates.append('updated_at = CURRENT_TIMESTAMP')
-            params.append(task_id)
-            cursor.execute(f'''
-                UPDATE tasks SET {', '.join(updates)}
-                WHERE id = ?
-            ''', params)
-            conn.commit()
-            success = cursor.rowcount > 0
-        else:
-            success = False
-        
-        conn.close()
-        return success
+        return self._retry_on_locked(_update)
     
     def delete_task(self, task_id: int) -> bool:
         """Elimina tarea"""
@@ -537,19 +585,26 @@ class Database:
     # ========== IMÁGENES DE TAREAS ==========
     
     def add_image_to_task(self, task_id: int, file_id: str, file_path: str) -> int:
-        """Añade una imagen a una tarea"""
-        conn = self.get_connection()
-        cursor = conn.cursor()
+        """Añade una imagen a una tarea con reintentos automáticos si la BD está bloqueada"""
+        def _add_image():
+            conn = None
+            try:
+                conn = self.get_connection()
+                cursor = conn.cursor()
+                
+                cursor.execute('''
+                    INSERT INTO task_images (task_id, file_id, file_path)
+                    VALUES (?, ?, ?)
+                ''', (task_id, file_id, file_path))
+                
+                image_id = cursor.lastrowid
+                conn.commit()
+                return image_id
+            finally:
+                if conn:
+                    conn.close()
         
-        cursor.execute('''
-            INSERT INTO task_images (task_id, file_id, file_path)
-            VALUES (?, ?, ?)
-        ''', (task_id, file_id, file_path))
-        
-        image_id = cursor.lastrowid
-        conn.commit()
-        conn.close()
-        return image_id
+        return self._retry_on_locked(_add_image)
     
     def get_task_images(self, task_id: int) -> List[Dict]:
         """Obtiene todas las imágenes de una tarea"""
@@ -702,17 +757,24 @@ class Database:
     # ========== HISTORIAL DE AMPLIACIONES ==========
     
     def add_ampliacion_history(self, task_id: int, ampliacion_text: str, user_name: str, user_id: int = None) -> int:
-        """Añade una entrada al historial de ampliaciones"""
-        conn = self.get_connection()
-        cursor = conn.cursor()
-        cursor.execute('''
-            INSERT INTO task_ampliaciones_history (task_id, ampliacion_text, user_name, user_id)
-            VALUES (?, ?, ?, ?)
-        ''', (task_id, ampliacion_text, user_name, user_id))
-        history_id = cursor.lastrowid
-        conn.commit()
-        conn.close()
-        return history_id
+        """Añade una entrada al historial de ampliaciones con reintentos automáticos si la BD está bloqueada"""
+        def _add_history():
+            conn = None
+            try:
+                conn = self.get_connection()
+                cursor = conn.cursor()
+                cursor.execute('''
+                    INSERT INTO task_ampliaciones_history (task_id, ampliacion_text, user_name, user_id)
+                    VALUES (?, ?, ?, ?)
+                ''', (task_id, ampliacion_text, user_name, user_id))
+                history_id = cursor.lastrowid
+                conn.commit()
+                return history_id
+            finally:
+                if conn:
+                    conn.close()
+        
+        return self._retry_on_locked(_add_history)
     
     def get_task_ampliaciones_history(self, task_id: int) -> List[Dict]:
         """Obtiene el historial de ampliaciones de una tarea"""
